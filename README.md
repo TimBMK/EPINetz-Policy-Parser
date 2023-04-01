@@ -4,7 +4,7 @@
 
 Der Policy Parser besitzt zwei Hauptbestandteile: Regelmäßige, automatisierte Updates der Termlisten (im live-Betrieb via Cronjobs) und die Klassifizierung neuer Dokumente in Echtzeit. Während die Updates der Termlisten vergleichsweise ressourcenintensiv sind, ist das Berechnen der Policy Scores in den Dokumenten wenig aufwändig, da lediglich diese lediglich in ihre Tokens zerlegt,* diese Tokens mit den Termlisten abgeglichen und darauf basierend die Gesamtscore berechnet wird.
 
-* evtl. direkt zerlegte Dokumente aus NLP-Pipeline beziehen
+*evtl. direkt zerlegte Dokumente aus NLP-Pipeline beziehen
 
 ### 1. Regelmäßige Updates der Termlisten
 
@@ -12,26 +12,31 @@ Wöchentliche Erstellung der Termlisten. Seed-Terme der Seed-Accounts aus dem le
 
 #### Seed-Term-Extraktion
 
-!! Offene Frage: ist händische Evaluation in der Extraktion der Seed Terme nötig? !!
+!! Offene Frage: Ist händische Evaluation in der Extraktion der Seed Terme nötig? !!
 
 1. Read-in der Listen an Ausschüssen, Ministerien und Ausschussmitgliedern und der Twitter User IDs
-
 2. Data Read-in von der EPINetz-Datenbank I: Tweets der Seed-Accounts (Ministerien, Ausschüsse & Ausschussmitglieder) von Datum X - 12 Monate
-
-2. Berechnung des Chi^2-Werts für Terme
-
-3. Filterung der Terme nach Chi^2, Werte variabel (default: 250 für Ausschussmitglieder, 500 für Ministerien, 30 für Ausschüsse)
-
-4. Ergebnis: Liste an Seed-Termen pro Policy Feld als .csv
+3. Berechnung des Chi^2-Werts für Terme
+4. Filterung der Terme nach Chi^2, Werte variabel (default: 250 für Ausschussmitglieder, 500 für Ministerien, 30 für Ausschüsse)
+5. Ergebnis: Liste an Seed-Termen pro Policy Feld als .csv
 
 
 #### Erweiterte Termlisten
 
 1. Data Read-in von der EPINetz-Datenbank II: alle EPINetz-Tweets von Datum X - 3 Monate (Wichtig: Query auf EPINetz Accounts beschränken)
-
 2. Read-in der Seed Terme
-
-3. 
+3. Bilden des PMI-gewichteten Netzwerks aus den Noun-Words der Tweets
+4. RWR für Seed Terme auf PMI Netzwerk
+5. Normalisierung der Scores
+6. Ergebnis: Erweiterte Termlisten pro Policy Feld als .csv
 
 ### 2. (live) Klassifikation neuer Dokumente
 
+!! Offene Frage: Wie werden die Daten angeliefert - Ping der EPINetz-Datenbank bei neuen Dokumenten oder täglicher Download aller neuen Dokumente? !!
+!! Offene Frage: Sollen die Scores über alle Policy Felder normalisiert werden (Menge = 1)? !!
+1. Read-in der Dokumente
+2. Read-in der erweiterten Termlisten
+3. (Tokenization)
+4. Klassifizierung der Dokumente auf Grundlage der in ihnen vorkommenden Terme und mit ihnen assoziierter Policy Felder
+5. (Normalisierung der Scores über alle Policy Felder - Wahrscheinlichkeit eines Dokuments, zu einem Policy Feld zu gehören)
+6. Ergebnis: 1 Vektor pro Dokument mit 1 Wert pro Policy Feld 
