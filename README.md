@@ -21,6 +21,7 @@ Wöchentliche Erstellung der Termlisten. Seed-Terme der Seed-Accounts aus dem le
 5. Filterung der Terme nach Chi^2, Werte variabel (default: 250 für Ausschussmitglieder, 500 für Ministerien, 30 für Ausschüsse)
 6. Ergebnis: Liste an Seed-Termen pro Policy Feld als .csv
 
+**Zuständige Funktion:**
 
 #### Erweiterte Termlisten
 
@@ -31,6 +32,8 @@ Wöchentliche Erstellung der Termlisten. Seed-Terme der Seed-Accounts aus dem le
 5. RWR für Seed Terme auf PMI Netzwerk
 6. Normalisierung der Scores
 7. Ergebnis: Erweiterte Termlisten pro Policy Feld als .csv
+
+**Zuständige Funktion:**
 
 ### 2. (live) Klassifikation neuer Dokumente
 
@@ -44,3 +47,5 @@ Wöchentliche Erstellung der Termlisten. Seed-Terme der Seed-Accounts aus dem le
 4. Klassifizierung der Dokumente auf Grundlage der in ihnen vorkommenden Terme und mit ihnen assoziierter Policy Felder
 5. (Normalisierung der Scores über alle Policy Felder - Wahrscheinlichkeit eines Dokuments, zu einem Policy Feld zu gehören)
 6. Ergebnis: 1 Vektor pro Dokument mit 1 Wert pro Policy Feld 
+
+**Zuständige Funktion:**
