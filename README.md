@@ -33,7 +33,9 @@ Wöchentliche Erstellung der Termlisten. Seed-Terme der Seed-Accounts aus dem le
 ### 2. (live) Klassifikation neuer Dokumente
 
 !! Offene Frage: Wie werden die Daten angeliefert - Ping der EPINetz-Datenbank bei neuen Dokumenten oder täglicher Download aller neuen Dokumente? !!
+
 !! Offene Frage: Sollen die Scores über alle Policy Felder normalisiert werden (Menge = 1)? !!
+
 1. Read-in der Dokumente
 2. Read-in der erweiterten Termlisten
 3. (Tokenization)
