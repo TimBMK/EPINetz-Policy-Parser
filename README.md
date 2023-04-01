@@ -39,8 +39,8 @@ Wöchentliche Erstellung der Termlisten. Seed-Terme der Seed-Accounts aus dem le
 !! Offene Frage: Sollen die Scores über alle Policy Felder normalisiert werden (Menge = 1)? 
 
 1. Read-in der Dokumente
-2. Read-in der erweiterten Termlisten
-3. (Tokenization)
+2. (Tokenization)
+3. Read-in der erweiterten Termlisten
 4. Klassifizierung der Dokumente auf Grundlage der in ihnen vorkommenden Terme und mit ihnen assoziierter Policy Felder
 5. (Normalisierung der Scores über alle Policy Felder - Wahrscheinlichkeit eines Dokuments, zu einem Policy Feld zu gehören)
 6. Ergebnis: 1 Vektor pro Dokument mit 1 Wert pro Policy Feld 
