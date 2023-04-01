@@ -3,7 +3,8 @@
 
 Ich habe nun Material für dich zusammengestellt, das sich befindet in: /data/EPINetz/EPINetz-Policy-Parser/RWR. Hier kommen noch ein paar Erläuterungen dazu inkl. Angabe von Stellschrauben, an denen noch gedreht werden kann (insbesondere Veränderung gewisser Cutt-offs):
 
-- Random_Walks_20230331Dies ist das Skript für die Random Walks. Das Paket, mit dem die RWRs berechnet werden, ist RandomWalkRestartMH (https://github.com/alberto-valdeolivas/RandomWalkRestartMH/; Installationshinweise und Dokumentation).Erläuterungen zu den einzelnen Bestandteilen dieses Codes:
+- Random_Walks_20230331
+Dies ist das Skript für die Random Walks. Das Paket, mit dem die RWRs berechnet werden, ist RandomWalkRestartMH (https://github.com/alberto-valdeolivas/RandomWalkRestartMH/; Installationshinweise und Dokumentation).Erläuterungen zu den einzelnen Bestandteilen dieses Codes:
 
 ## 1. Read Network
 Hier wird der Netzwerk-Snapshot (bisher Quartal) eingelesen und in ein igraph-Objekt umgewandelt, auf welches später das RWR-Paket zugreift bzw. in dem die RWRs stattfinden.
@@ -31,5 +32,9 @@ Nach der Berechnung der RWRs findet für jeden Politikbereich noch die Verarbeit
 
 Bitte beachte: Im Codebereich zur Berechnung der RWRs für den Politikbereich Arbeit habe ich gerade noch zusätzliche Kommentare eingefügt, die dir hoffentlich beim Nachvollziehen helfen.
 
-- data_network_snapshots_EWDies ist dein Skript für die Snapshot-Erstellung mit meinen Anpassungen (hier wird der Output topic_graphs_quarter201901.csv.tar.gz erstellt, der im oben beschriebenen Skript genutzt wird).
-Stellschraube: Variation der Zeiträume (Quartale, Monate, Wochen)- Terms_Illustration_Docs
+- data_network_snapshots_EW
+Dies ist dein Skript für die Snapshot-Erstellung mit meinen Anpassungen (hier wird der Output topic_graphs_quarter201901.csv.tar.gz erstellt, der im oben beschriebenen Skript genutzt wird).
+Stellschraube: Variation der Zeiträume (Quartale, Monate, Wochen)
+
+- Terms_Illustration_Docs
+Dies ist dein Skript für die Klassifikation der Dokumente mit meinen Anpassungen.
