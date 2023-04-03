@@ -44,6 +44,6 @@ HD wird in ihrer Pipeline einen Call zu unserer API einbauen, der im live Betrie
 3. Read-in der erweiterten Termlisten
 4. Klassifizierung der Dokumente auf Grundlage der in ihnen vorkommenden Terme und mit ihnen assoziierter Policy Felder
 5. (Normalisierung der Scores über alle Policy Felder - Wahrscheinlichkeit eines Dokuments, zu einem Policy Feld zu gehören)
-6. Ergebnis: 1 Vektor pro Dokument mit 1 Wert pro Policy Feld 
+6. Ergebnis: 1 Nameed Vektor pro Dokument mit 1 Wert pro Policy Feld und Name des Policy Felds
 
 **Zuständige Funktion:**
