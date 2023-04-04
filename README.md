@@ -10,8 +10,6 @@ Wöchentliche Erstellung der Termlisten. Seed-Terme der Seed-Accounts aus dem le
 
 ### Seed-Term-Extraktion
 
-!! Offene Frage: Ist händische Evaluation in der Extraktion der Seed Terme nötig? 
-
 1. Read-in der Listen an Ausschüssen, Ministerien und Ausschussmitgliedern und der Twitter User IDs
 2. Data Read-in von der EPINetz-Datenbank I: Tweets der Seed-Accounts (Ministerien, Ausschüsse & Ausschussmitglieder) von Datum X - 12 Monate
 3. Tokenization
@@ -37,13 +35,11 @@ Wöchentliche Erstellung der Termlisten. Seed-Terme der Seed-Accounts aus dem le
 
 HD wird in ihrer Pipeline einen Call zu unserer API einbauen, der im live Betrieb Dokumente klassifiziert. 
 
-!! Offene Frage: Sollen die Scores über alle Policy Felder normalisiert werden (Menge = 1)? 
-
 1. Read-in der Dokumente
 2. Tokenization
 3. Read-in der erweiterten Termlisten
 4. Klassifizierung der Dokumente auf Grundlage der in ihnen vorkommenden Terme und mit ihnen assoziierter Policy Felder
-5. (Normalisierung der Scores über alle Policy Felder - Wahrscheinlichkeit eines Dokuments, zu einem Policy Feld zu gehören)
+5. Normalisierung der Scores über alle Policy Felder - Wahrscheinlichkeit eines Dokuments, zu einem Policy Feld zu gehören  - als Option
 6. Ergebnis: 1 Named Vektor pro Dokument mit 1 Wert pro Policy Feld und Name des Policy Felds
 
 **Zuständige Funktion:**
