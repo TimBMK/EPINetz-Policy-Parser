@@ -17,7 +17,7 @@ Wöchentliche Erstellung der Termlisten. Seed-Terme der Seed-Accounts aus dem le
 5. Filterung der Terme nach Chi^2, Werte variabel (default: 250 für Ausschussmitglieder, 500 für Ministerien, 30 für Ausschüsse)
 6. Ergebnis: Liste an Seed-Termen pro Policy Feld als .csv
 
-**Zuständige Funktion:**
+**Zuständige Funktion: get_seed_terms()**
 
 ### Erweiterte Termlisten
 
