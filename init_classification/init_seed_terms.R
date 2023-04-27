@@ -16,15 +16,27 @@ options(future.globals.maxSize = (100000*1024^2)) # 10 gb Max Size for Paralleli
 
 source("get_seed_terms.R")
 
-plan(multisession, workes = 20) # start multisession (for mapping processes)
+source("utils_nested_data.R")
+
+# plan(multisession, workers = 4) # start multisession (for mapping processes) - Multisession for R Studio Sessions
+plan(multicore, workers = 4) # start multisession (for mapping processes) - ! DO NOT USE MULTICORE IN RSTUDIO SESSION. ONLY WHEN CALLING THE SCRIPT DIRECTLY !
+#                              # !!multicore plans can be unstable!!
 
 chi2_ministries <- 500 # set chi^2 threshold for ministries
 chi2_committee_members <- 250 # set chi^2 threshold for within-committee members
 chi2_committees <- 30 # set chi^2 threshold between committees
 
+seed <- 20230425 # seed for parallelization (prevents RNG issues)
 
+cat("\n preparations \n\n")
 
 # read data
+
+ministries <- read_csv("Seed_Accounts/ministry_seeds_2023-04-06.csv", col_types = list(user_id = "c"))
+
+committees <- read_csv("Seed_Accounts/committee_seeds_19-20_2023-04-06.csv", col_types = list(user_id = "c"))
+
+
 seed_tweets <-
   vroom(
     file = "init_classification/data_seeds_init_2023-04-10.csv.tar.gz",
@@ -79,7 +91,8 @@ committee_NE <- committee_tweets %>%
 
   # min <- date_range$from + years(1) # do not go back behind the first LP (for committees) -- only necessary for data ranging beyond the LP (then, only ministry data could be used)
 
-dat_list <- future_map(ceiling_date(seed_tweets$`_source.created_at`, unit = "week") %>% unique(),
+dat_list <- future_map(ceiling_date(seed_tweets$`_source.created_at`, 
+                                    unit = "week") %>% unique(),
                    ~ {
                      # ministry_tweets %>% mutate(type = "ministry") %>%                # ministry + committee tweets combined ... ! only necessary for min date filtering
                      #   bind_rows(committee_tweets %>% mutate(type = "committee")) %>% # ... with indicator for filtering ...
@@ -87,35 +100,56 @@ dat_list <- future_map(ceiling_date(seed_tweets$`_source.created_at`, unit = "we
                      # select(`_id`, `_source.created_at`, type) %>% 
                      seed_tweets %>% 
                        select(`_id`, `_source.created_at`) %>% 
-                       mutate(week = ceiling_date(`_source.created_at`, unit = "week")) %>% # make week indicator (last day of the week)
-                       filter(week >= (.x -  years(1)) & # beginning: 1 year before
+                       mutate(week = ceiling_date(`_source.created_at`, 
+                                                  unit = "week")) %>% # make week indicator (last day of the week)
+                       filter(week >= (.x - years(1)) & # beginning: 1 year before
                                 week <= .x)             # end: week of interest
                        # filter(!(type == "committee" & `_source.created_at` <= min)) # committees only after min date (before: only ministries) -- only necessary for data ranging beyond the LP 
                    })
 
-names(dat_list) <- ceiling_date(seed_tweets$`_source.created_at`, unit = "week") %>% unique() # name the dataframes in the list
+names(dat_list) <- ceiling_date(seed_tweets$`_source.created_at`, 
+                                unit = "week") %>% 
+  unique() # name the dataframes in the list
 
 
 # Calculate Keyness for each Frame
 
-## Ministries
-seed_terms_ministries <- dat_list %>% 
-  future_map( 
-    . %>% 
-      inner_join(ministry_NE, by = "_id") %>% # add NEs
-      get_seed_terms(doc_id = "_id",          # calculate Seed Terms
-                     tokens = "lemma",
-                     grouping_var = "official_name",
-                     policy_field = "policy_field",
-                     threshold = chi2_ministries,
-                     show_plots = F,
-                     save_plots = T)
-    )
+  ### saving nested objects is rather inefficient, so we flatten/save them as different objects and pack them up
 
-saveRDS(seed_terms_ministries, file = "init_classification/init_seed_terms_ministries.RDS")
+## Ministries
+# cat("\n Ministries \n\n") # keep track of the script in out file
+# seed_terms_ministries <- dat_list %>% 
+#   future_map( 
+#     . %>% 
+#       inner_join(ministry_NE, by = "_id") %>% # add NEs
+#       get_seed_terms(doc_id = "_id",          # calculate Seed Terms
+#                      tokens = "lemma",
+#                      grouping_var = "official_name",
+#                      policy_field = "policy_field",
+#                      threshold = chi2_ministries,
+#                      show_plots = F,
+#                      save_plots = T),
+#     .options = furrr_options(seed = seed), # set seed to prevent RNG issues
+#     .progress = T
+#     )
+# 
+# cat("\n Calculations finished. Saving...")
+# 
+# save_nested_tarball(seed_terms_ministries,
+#                     index = 1,
+#                     file_name = "init_classification/ministry_seeds.gz")
+# 
+# save_nested_plots_tarball(seed_terms_ministries,
+#                           index = 2,
+#                           file_name = "init_classification/ministry_seed_plots.gz",
+#                           progress = T)
+
+
+# saveRDS(seed_terms_ministries, file = "init_classification/init_seed_terms_ministries.RDS")
 
 
 ## Committees
+cat("\n Committees \n\n")
 seed_terms_committees <- dat_list %>% 
   future_map( 
     . %>% 
@@ -126,13 +160,27 @@ seed_terms_committees <- dat_list %>%
                      policy_field = "policy_field",
                      threshold = chi2_committees,
                      show_plots = F,
-                     save_plots = T)
+                     save_plots = T),
+    .options = furrr_options(seed = seed), # set seed to prevent RNG issues
+    .progress = T
   )
 
-saveRDS(seed_terms_committees, file = "init_classification/init_seed_terms_committees.RDS")
+cat("\n Calculations finished. Saving...")
+
+save_nested_tarball(seed_terms_committees,
+                    index = 1,
+                    file_name = "init_classification/ministry_seeds.gz")
+
+save_nested_plots_tarball(seed_terms_committees,
+                          index = 2,
+                          file_name = "init_classification/ministry_seed_plots.gz",
+                          progress = F)
+
+# saveRDS(seed_terms_committees, file = "init_classification/init_seed_terms_committees.RDS")
 
 
 ## Committee Members
+cat("\n Committee Members \n\n")
 seed_terms_committee_members <- dat_list %>% 
   future_map( 
     . %>% 
@@ -146,10 +194,26 @@ seed_terms_committee_members <- dat_list %>%
                                  threshold = chi2_committee_members,
                                  show_plots = F,
                                  save_plots = T)) %>% 
-      rbindlist()
+      rbindlist(),
+    .options = furrr_options(seed = seed), # set seed to prevent RNG issues
+    .progress = T
   )
 
-saveRDS(seed_terms_committee_members, file = "init_classification/init_seed_terms_committee_members.RDS")
+cat("\n Calculations finished. Saving...")
+
+save_nested_tarball(seed_terms_committee_members,
+                    index = 1,
+                    file_name = "init_classification/ministry_seeds.gz")
+
+save_nested_plots_tarball(seed_terms_committee_members,
+                          index = 2,
+                          file_name = "init_classification/ministry_seed_plots.gz",
+                          progress = F)
+
+# saveRDS(seed_terms_committee_members, file = "init_classification/init_seed_terms_committee_members.RDS")
+
+
+
 
 
 plan(sequential) # end multisession
