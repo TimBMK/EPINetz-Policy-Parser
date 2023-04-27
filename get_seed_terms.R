@@ -25,7 +25,7 @@ get_seed_terms <- function(data,              # dataframe containing tokens, gro
       quanteda::corpus(text_field = "text") # as no docid is given, they are generated, allowing for duplicates (i.e. same tweet in multiple fields)
   } else { # if no doc_id is given, each row becomes a document
     corpus <- data %>% 
-      corpus(text_field = tokens) # as no docid is given, they are generated, allowing for duplicates (i.e. same tweet in multiple fields)
+      quanteda::corpus(text_field = tokens) # as no docid is given, they are generated, allowing for duplicates (i.e. same tweet in multiple fields)
   }
   
   # prepare DFM (incl. grouping and stopword removal)
@@ -37,32 +37,66 @@ get_seed_terms <- function(data,              # dataframe containing tokens, gro
     quanteda::dfm()
   
   # Calculate Keyness
-  keyness <- dplyr::tibble() # container
+  
+
+  
+  # keyness <- dplyr::tibble() # container
+  #
+  # for (group in (dfm %>% quanteda::docvars() %>% dplyr::distinct() %>% dplyr::pull())) { # calculate keyness 
+  #   
+  #   textstat <- quanteda.textstats::textstat_keyness(dfm, measure = measure, target = group)
+  #   
+  #   if (show_plots == TRUE) {
+  #     print(quanteda.textplots::textplot_keyness(textstat))
+  #     readline(prompt="Press [enter] to show next plot")
+  #   }
+  #   
+  #   if (save_plots) {
+  #     plots[[group]] <- quanteda.textplots::textplot_keyness(textstat)
+  #   }
+  #   
+  #   keyness <- keyness %>% 
+  #     dplyr::bind_rows(textstat  %>% 
+  #                        dplyr::as_tibble() %>% 
+  #                        dplyr::mutate({{grouping_var}} := group))
+  #   
+  # }
+  
+  dfm_groups <- dfm %>% quanteda::docvars() %>% dplyr::distinct() %>% dplyr::pull()
   
   if (save_plots == T) {
-    plots <- vector(mode = "list", length = length(dfm %>% quanteda::docvars() %>% dplyr::distinct() %>% dplyr::pull())) %>%  # container
-      setNames(dfm %>% quanteda::docvars() %>% dplyr::distinct() %>% dplyr::pull()) # with names
+    plots <- vector(mode = "list", length = length(dfm_groups)) %>%  # container
+      setNames(dfm_groups) # with names
   }
   
-  for (group in (dfm %>% quanteda::docvars() %>% dplyr::distinct() %>% dplyr::pull())) { # calculate keyness 
-    
-    textstat <- quanteda.textstats::textstat_keyness(dfm, measure = measure, target = group)
-    
-    if (show_plots == TRUE) {
-      print(quanteda.textplots::textplot_keyness(textstat))
-      readline(prompt="Press [enter] to show next plot")
-    }
-    
-    if (save_plots) {
-      plots[[group]] <- quanteda.textplots::textplot_keyness(textstat)
-    }
-    
-    keyness <- keyness %>% 
-      dplyr::bind_rows(textstat  %>% 
-                         dplyr::as_tibble() %>% 
-                         dplyr::mutate({{grouping_var}} := group))
-    
-  }
+  keyness <- dfm_groups %>% 
+    purrr:::map(~ tryCatch({
+      
+      group <- .
+      
+      textstat <- quanteda.textstats::textstat_keyness(dfm, 
+                                                       measure = measure, 
+                                                       target = group)
+      
+      if (show_plots == TRUE) {
+        print(quanteda.textplots::textplot_keyness(textstat))
+        readline(prompt="Press [enter] to show next plot")
+      }
+      
+      if (save_plots == TRUE) {
+        plots[[group]] <<- tryCatch(quanteda.textplots::textplot_keyness(textstat), # assign to plots object outside of function
+                                    error = function(e) NULL) # failsafe
+      }
+      
+      textstat %>% 
+        dplyr::as_tibble() %>% 
+        dplyr::mutate({{grouping_var}} := group) 
+      
+    }), error = function(e) NULL) %>% 
+    compact() %>% 
+    purrr::list_rbind()
+  
+
   
   # Filter results by keyness value
   if (!is.null(threshold)) {

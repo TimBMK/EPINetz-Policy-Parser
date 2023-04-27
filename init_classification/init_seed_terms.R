@@ -117,7 +117,8 @@ names(dat_list) <- ceiling_date(seed_tweets$`_source.created_at`,
   ### saving nested objects is rather inefficient, so we flatten/save them as different objects and pack them up
 
 ## Ministries
-# cat("\n Ministries \n\n") # keep track of the script in out file
+
+cat("\n Ministries \n\n") # keep track of the script in out file
 # seed_terms_ministries <- dat_list %>% 
 #   future_map( 
 #     . %>% 
@@ -147,72 +148,120 @@ names(dat_list) <- ceiling_date(seed_tweets$`_source.created_at`,
 
 # saveRDS(seed_terms_ministries, file = "init_classification/init_seed_terms_ministries.RDS")
 
+dat_list %>% 
+  future_iwalk(\(x, idx)
+               {
+                 dat <- x %>%
+                   inner_join(ministry_NE, by = "_id") %>% # add NEs
+                   get_seed_terms(
+                     doc_id = "_id",
+                     tokens = "lemma",
+                     grouping_var = "official_name",
+                     policy_field = "policy_field",
+                     threshold = chi2_ministries,
+                     show_plots = F,
+                     save_plots = T
+                   )
+                 
+                 dat %>% .[[1]] %>% mutate(period = idx) %>%
+                   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
+                   vroom_write(file = "init_classification/seed_terms_ministries.csv.tar.gz", append = T)
+                 
+                 dat %>% .[[2]] %>% iwalk(\(plot, plotid)
+                                          suppressMessages(ggsave(
+                                            plot = plot,
+                                            width = 18,
+                                            height = 10,
+                                            filename = paste0(plotid, ".png"),
+                                            path = file.path("init_classification/seed_terms_ministries_plots", idx)
+                                          )))
+  },
+  .options = furrr_options(seed = seed), # set seed to prevent RNG issues
+  .progress = F)
+
 
 ## Committees
 cat("\n Committees \n\n")
-seed_terms_committees <- dat_list %>% 
-  future_map( 
-    . %>% 
-      inner_join(committee_NE, by = "_id") %>% # add NEs
-      get_seed_terms(doc_id = "_id",
+dat_list %>% 
+  future_iwalk(\(x, idx)
+               {
+                 dat <- x %>%
+                   inner_join(committee_NE, by = "_id") %>% # add NEs
+                   get_seed_terms(
+                     doc_id = "_id",
                      tokens = "lemma",
                      grouping_var = "committee",
                      policy_field = "policy_field",
                      threshold = chi2_committees,
                      show_plots = F,
-                     save_plots = T),
-    .options = furrr_options(seed = seed), # set seed to prevent RNG issues
-    .progress = T
-  )
+                     save_plots = T
+                   )
+                 
+                 dat %>% .[[1]] %>% mutate(period = idx) %>%
+                   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
+                   vroom_write(file = "init_classification/seed_terms_committees.csv.tar.gz", append = T)
+                 
+                 dat %>% .[[2]] %>% iwalk(\(plot, plotid)
+                                          suppressMessages(ggsave(
+                                            plot = plot,
+                                            width = 18,
+                                            height = 10,
+                                            filename = paste0(plotid, ".png"),
+                                            path = file.path("init_classification/seed_terms_committees_plots", idx)
+                                          )))
+  },
+  .options = furrr_options(seed = seed), # set seed to prevent RNG issues
+  .progress = F)
 
-cat("\n Calculations finished. Saving...")
-
-save_nested_tarball(seed_terms_committees,
-                    index = 1,
-                    file_name = "init_classification/ministry_seeds.gz")
-
-save_nested_plots_tarball(seed_terms_committees,
-                          index = 2,
-                          file_name = "init_classification/ministry_seed_plots.gz",
-                          progress = F)
+# cat("\n Calculations finished. Saving...")
+# 
+# save_nested_tarball(seed_terms_committees,
+#                     index = 1,
+#                     file_name = "init_classification/committee_seeds.gz")
+# 
+# save_nested_plots_tarball(seed_terms_committees,
+#                           index = 2,
+#                           file_name = "init_classification/committee_seed_plots.gz",
+#                           progress = F)
 
 # saveRDS(seed_terms_committees, file = "init_classification/init_seed_terms_committees.RDS")
 
 
 ## Committee Members
 cat("\n Committee Members \n\n")
-seed_terms_committee_members <- dat_list %>% 
-  future_map( 
-    . %>% 
-      inner_join(committee_NE, by = "_id") %>% # add NEs
-      split(.$committee) %>% 
-      map(\(data) get_seed_terms(data = data,
-                                 doc_id = "_id",
-                                 tokens = "lemma",
-                                 grouping_var = "official_name",
-                                 policy_field = "policy_field",
-                                 threshold = chi2_committee_members,
-                                 show_plots = F,
-                                 save_plots = T)) %>% 
-      rbindlist(),
-    .options = furrr_options(seed = seed), # set seed to prevent RNG issues
-    .progress = T
-  )
 
-cat("\n Calculations finished. Saving...")
-
-save_nested_tarball(seed_terms_committee_members,
-                    index = 1,
-                    file_name = "init_classification/ministry_seeds.gz")
-
-save_nested_plots_tarball(seed_terms_committee_members,
-                          index = 2,
-                          file_name = "init_classification/ministry_seed_plots.gz",
-                          progress = F)
-
-# saveRDS(seed_terms_committee_members, file = "init_classification/init_seed_terms_committee_members.RDS")
-
-
+dat_list %>% 
+  future_iwalk(\(x, idx)
+               {
+                 dat <- x %>% 
+                   inner_join(committee_NE, by = "_id") %>% # add NEs
+                   split(.$committee) %>% 
+                   map(\(data) get_seed_terms(data = data,
+                                              doc_id = "_id",
+                                              tokens = "lemma",
+                                              grouping_var = "official_name",
+                                              policy_field = "policy_field",
+                                              threshold = chi2_committee_members,
+                                              show_plots = F,
+                                              save_plots = T)) 
+                 dat %>% iwalk(\(y, idy)
+                               {
+                                 y %>% .[[1]] %>% mutate(period = idx) %>%
+                                   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
+                                   vroom_write(file = "init_classification/seed_terms_committee_members.csv.tar.gz", append = T)
+                                 
+                                 y %>% .[[2]] %>% iwalk(\(plot, plotid)
+                                                        suppressMessages(ggsave(
+                                                          plot = plot,
+                                                          width = 18,
+                                                          height = 10,
+                                                          filename = paste0(plotid, ".png"),
+                                                          path = file.path("init_classification/seed_terms_committee_members_plots", idx)
+                                                        )))
+                 })
+  },
+  .options = furrr_options(seed = seed), # set seed to prevent RNG issues
+  .progress = F)
 
 
 

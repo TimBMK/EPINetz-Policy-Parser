@@ -303,6 +303,7 @@ walk_NE <- drop_quantile(walk_NE,
 # walk_NE <- walk_NE %>% mutate(lemma = case_when(!str_detect(lemma, "http") ~ tolower(lemma), # convert to lower,
 #                                                 .default = lemma)) # but preserve URLs as is (to not break twitter links)
 
+walk_NE <- walk_NE %>% mutate(lemma = tolower(lemma)) # set case to lower to ignore casing in networks
 
 # Prepare Network for Random Walks
 
@@ -338,17 +339,18 @@ seeds <- rbindlist(list(seed_terms_ministries, # bind seed terms of subsets toge
   filter(feature %in% walk_NE$lemma) %>% # drop seed terms not in the walk network
   split(.$policy_field)                        # ... and split by policy field
 
-rwr_results <- seeds %>% future_map(\(seed_dat)
-                          seed_dat$feature %>%
-                            map(
-                              \(group)
-                              Random.Walk.Restart.Multiplex(
-                                x = AdjMatrixNorm,
-                                MultiplexObject = multiplex,
-                                Seeds = group
-                              )
-                            ), 
-                          .progress = T)
+rwr_results <- seeds %>% future_map(\(seed_group)
+                                    seed_group$feature %>%
+                                      map(\(seed)
+                                          tryCatch( # capture non-standard errors thrown by Random.Walk.Restart.Multiplex
+                                            Random.Walk.Restart.Multiplex(
+                                              x = AdjMatrixNorm,
+                                              MultiplexObject = multiplex,
+                                              Seeds = seed
+                                            ), 
+                                            error  = function(e) NULL) # return NULL for errors...
+                                          ) %>% compact(), # ... and remove NULLs
+                                    .progress = T) 
 
 flattened_results <- rwr_results %>%
   list_flatten(name_spec = "{outer}") %>%
