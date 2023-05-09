@@ -1,7 +1,7 @@
 ## Initial Classification ##
 ############################
 
-# Classify Terms #
+# Classify Seed Terms #
 
 {
   library(tidyverse)
@@ -39,7 +39,7 @@ committees <- read_csv("Seed_Accounts/committee_seeds_19-20_2023-04-06.csv", col
 
 seed_tweets <-
   vroom(
-    file = "init_classification/data_seeds_init_2023-04-10.csv.tar.gz",
+    file = "init_classification/data_init_seeds_2023-04-10.csv.tar.gz",
     # Important! specify coltypes to preserve correct IDs
     col_types = list(
       `_id` = "c",
@@ -54,7 +54,7 @@ seed_tweets <-
   ) 
 
 
-seed_tokens <- vroom("init_classification/tokens_init_2023-04-10.csv.tar.gz", col_types = list(doc_id = "c"))
+seed_tokens <- vroom("init_classification/tokens_init_seeds_2023-04-10.csv.tar.gz", col_types = list(doc_id = "c"))
 
 
 seed_NE <- seed_tokens %>% as_tibble() %>% 
@@ -181,37 +181,38 @@ dat_list %>%
 
 
 ## Committees
-cat("\n Committees \n\n")
-dat_list %>% 
-  future_iwalk(\(x, idx)
-               {
-                 dat <- x %>%
-                   inner_join(committee_NE, by = "_id") %>% # add NEs
-                   get_seed_terms(
-                     doc_id = "_id",
-                     tokens = "lemma",
-                     grouping_var = "committee",
-                     policy_field = "policy_field",
-                     threshold = chi2_committees,
-                     show_plots = F,
-                     save_plots = T
-                   )
-                 
-                 dat %>% .[[1]] %>% mutate(period = idx) %>%
-                   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
-                   vroom_write(file = "init_classification/seed_terms_committees.csv.tar.gz", append = T)
-                 
-                 dat %>% .[[2]] %>% iwalk(\(plot, plotid)
-                                          suppressMessages(ggsave(
-                                            plot = plot,
-                                            width = 18,
-                                            height = 10,
-                                            filename = paste0(plotid, ".png"),
-                                            path = file.path("init_classification/seed_terms_committees_plots", idx)
-                                          )))
-  },
-  .options = furrr_options(seed = seed), # set seed to prevent RNG issues
-  .progress = F)
+### saving them this way fumbled columns somehow. See init_seed_terms_committees.R for the alternative (and utilized) method
+# cat("\n Committees \n\n")
+# dat_list %>% 
+#   future_iwalk(\(x, idx)
+#                {
+#                  dat <- x %>%
+#                    inner_join(committee_NE, by = "_id") %>% # add NEs
+#                    get_seed_terms(
+#                      doc_id = "_id",
+#                      tokens = "lemma",
+#                      grouping_var = "committee",
+#                      policy_field = "policy_field",
+#                      threshold = chi2_committees,
+#                      show_plots = F,
+#                      save_plots = T
+#                    )
+#                  
+#                  dat %>% .[[1]] %>% mutate(period = idx) %>%
+#                    mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
+#                    vroom_write(file = "init_classification/seed_terms_committees.csv.tar.gz", append = T)
+#                  
+#                  dat %>% .[[2]] %>% iwalk(\(plot, plotid)
+#                                           suppressMessages(ggsave(
+#                                             plot = plot,
+#                                             width = 18,
+#                                             height = 10,
+#                                             filename = paste0(plotid, ".png"),
+#                                             path = file.path("init_classification/seed_terms_committees_plots", idx)
+#                                           )))
+#   },
+#   .options = furrr_options(seed = seed), # set seed to prevent RNG issues
+#   .progress = F)
 
 # cat("\n Calculations finished. Saving...")
 # 

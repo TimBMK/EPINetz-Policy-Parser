@@ -42,22 +42,24 @@ conn$ping()
 
 # read data
 
-ministries <- read_csv("Seed_Accounts/ministry_seeds_2023-04-06.csv", col_types = list(user_id = "c"))
-
 committees <- read_csv("Seed_Accounts/committee_seeds_19-20_2023-04-06.csv", col_types = list(user_id = "c"))
+
+epinetz_list <- readRDS("EPINetz_full_collection_list_update_10.RDs")
 
 
 # API call
 
 date_range <- tibble(until = ymd("2023-04-10"), from = min(committees$begin)) # from beginning of first WP until 10th of April 2023
 
-account_list <- ministries %>% bind_rows(committees) %>% 
+account_list <- epinetz_list %>% 
   filter(!is.na(user_id)) %>% 
   distinct(user_id)
 
-seed_tweets <- tibble() # data container
+walk_tweets <- tibble() # data container
 
 for (i in seq(1, length(account_list %>% distinct(user_id) %>% pull()), 100)) { # the search query needs to be chopped up into smaller bits (100 accounts per chunk)
+  
+  cat(paste("Rows", i, "to", i+(100-1), "\n"))
   
   dat <- na.omit((account_list %>% distinct(user_id) %>% pull())[i:(i+(100-1))]) # account chunks of 100 each 
   
@@ -67,28 +69,28 @@ for (i in seq(1, length(account_list %>% distinct(user_id) %>% pull()), 100)) { 
   
   tweets <- full_scroll(conn, q = q, index = "twitter_v2_tweets")
   
-  seed_tweets <- bind_rows(seed_tweets, tweets)
+  walk_tweets <- bind_rows(walk_tweets, tweets)
   
 }
 
-vroom_write(seed_tweets %>% rowwise() %>% mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x)), # text as utf8
+vroom_write(walk_tweets %>% rowwise() %>% mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x)), # text as utf8
                                                  across(.cols = where(is.list), ~ str_c(unlist(.x), collapse = ", "))), # unlist lists (otherwise lost in export!)
-            delim = ",", file = "init_classification/data_seeds_init_2023-04-10.csv.tar.gz")
+            delim = ",", file = "init_classification/data_init_walk_2023-04-10.csv.tar.gz")
 
 
 
 
 # Tokenization, Lemmatization, Noun-Word Filtering
 
-seed_corpus <- corpus(seed_tweets, docid_field = "_id", text_field = "_source.text", 
-                      meta = list(names(seed_tweets)), # preserve all vars as metadata
+walk_corpus <- corpus(walk_tweets, docid_field = "_id", text_field = "_source.text", 
+                      meta = list(names(walk_tweets)), # preserve all vars as metadata
                       unique_docnames = T) # we could also use the conversation IDs to treat conversations as single documents
 
 spacy_initialize(model = "de_core_news_lg") # start python spacy
 
-seed_tokens <-
+walk_tokens <-
   spacy_parse(
-    seed_corpus,
+    walk_corpus,
     pos = T,
     tag = T,
     lemma = T,
@@ -97,6 +99,6 @@ seed_tokens <-
 
 spacy_finalize() # end spacy
 
-saveRDS(seed_tokens, "init_classification/tokens_init_2023-04-10.RDS")
-seed_tokens %>% mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% vroom_write(file = "init_classification/tokens_init_2023-04-10.csv.tar.gz", delim = ",")
+saveRDS(walk_tokens, "init_classification/tokens_init_walk_2023-04-10.RDS")
+walk_tokens %>% mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% vroom_write(file = "init_classification/tokens_init_walk_2023-04-10.csv.tar.gz", delim = ",")
 

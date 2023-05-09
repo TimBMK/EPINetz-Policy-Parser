@@ -24,6 +24,8 @@ source("utils_nested_data.R") # nested data utils
 
 source("utils_text_processing.R") # text processing utils
 
+source("utils_networks.R") # networks utils
+
 plan(multisession, workers = 4) # set up future multisession for future_map functions
 
 chi2_ministries <- 500 # set chi^2 threshold for ministries
@@ -32,6 +34,8 @@ chi2_committees <- 30 # set chi^2 threshold between committees
 
 time_frame_seeds <- years(1) # length of the time frame for seed term extraction
 time_frame_walks <- months(3) # length of the time frame for random walk term extraction
+
+walk_score <- 0.9 # Minimum normalized Random Walk Score for Random Walk Terms
 
 # user = readline(prompt = "Enter Heidelberg Username: ") # enter credentials in console
 # password = readline(prompt = "Enter Password: ") # user prompts for username and password, so the password is not visible in the script
@@ -321,10 +325,12 @@ walk_network <- snapshots(walk_NE %>% mutate(time = "full"), # add dummy variabl
 
 multiplex <- create.multiplex(list(walk_network = walk_network)) # make multiplex object for random walks
 
-{
-  AdjMatrix <- compute.adjacency.matrix(multiplex) # make adjacency matrix
-  gc() # this is important - the computation of the adjacency matrix is very costly and doesn't flush automatically!
-}
+# {
+#   AdjMatrix <- compute.adjacency.matrix(multiplex) # make adjacency matrix
+#   gc() # this is important - the computation of the adjacency matrix is very costly and doesn't flush automatically!
+# }
+
+AdjMatrix <- compute.adjacency.matrix.mono(multiplex) # an efficient adjacency matrix implementation for monoplex networks
 
 AdjMatrixNorm <- normalize.multiplex.adjacency(AdjMatrix) # normalize the adjacency matrix
 
@@ -358,7 +364,8 @@ flattened_results <- rwr_results %>%
     tibble(x[[1]], seed_node = x[[2]], policy_field = idx) %>% 
       mutate(ScoreNorm = rescale(Score, to = c(0, 1))), # rescale scores
   .progress = T) %>% 
-  rbindlist()
+  rbindlist() %>% 
+  filter(ScoreNorm >= walk_score)
 
 vroom_write(flattened_results, file = paste0("regular_classification/walk_terms_", Sys.Date(), ".csv.tar.gz"))
 
