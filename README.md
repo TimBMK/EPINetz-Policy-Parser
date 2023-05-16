@@ -14,8 +14,9 @@ Wöchentliche Erstellung der Termlisten. Seed-Terme der Seed-Accounts aus dem le
 2. Data Read-in von der EPINetz-Datenbank I: Tweets der Seed-Accounts (Ministerien, Ausschüsse & Ausschussmitglieder) von Datum X - 12 Monate
 3. Tokenization
 4. Berechnung des Chi^2-Werts für Terme
-5. Filterung der Terme nach Chi^2, Werte variabel (default: 250 für Ausschussmitglieder, 500 für Ministerien, 30 für Ausschüsse)
-6. Ergebnis: Liste an Seed-Termen pro Policy Feld als .csv
+5. Filterung der Terme nach Chi^2, Werte variabel (default: 250 für Ausschussmitglieder, 500 für Ministerien, 30 für Ausschüsse), 
+6. Gefilterte Terme der Ausschussmitglieder von den restlichen Termen des jeweiligen Ausschusses *abziehen*, um individuelle Agenden (z.B. Wahlkampf) herauszufiltern 
+7. Ergebnis: Liste an Seed-Termen pro Policy Feld als .csv
 
 **Zuständige Funktion: get_seed_terms()**
 
