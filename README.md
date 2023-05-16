@@ -22,7 +22,7 @@ Wöchentliche Erstellung der Termlisten. Seed-Terme der Seed-Accounts aus dem le
 
 ### Erweiterte Termlisten
 
-1. Data Read-in von der EPINetz-Datenbank II: alle EPINetz-Tweets von Datum X - 3 Monate (Wichtig: Query auf EPINetz Accounts beschränken)
+1. Data Read-in von der EPINetz-Datenbank II: alle EPINetz-Tweets von Datum X - 12 Wochen (Wichtig: Query auf EPINetz Accounts beschränken)
 2. Tokenization
 3. Read-in der Seed Terme
 4. Bilden des PMI-gewichteten Netzwerks aus den Noun-Words der Tweets
