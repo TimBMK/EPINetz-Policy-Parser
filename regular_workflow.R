@@ -24,7 +24,7 @@ source("utils_nested_data.R") # nested data utils
 
 source("utils_text_processing.R") # text processing utils
 
-source("utils_networks.R") # networks utils
+source("get_rwr_terms.R") # random walk functions
 
 plan(multisession, workers = 4) # set up future multisession for future_map functions
 
@@ -32,10 +32,14 @@ chi2_ministries <- 500 # set chi^2 threshold for ministries
 chi2_committee_members <- 250 # set chi^2 threshold for within-committee members
 chi2_committees <- 30 # set chi^2 threshold between committees
 
+date <- Sys.Date()
+# date <- ymd("2023-04-25") # testing
+
 time_frame_seeds <- years(1) # length of the time frame for seed term extraction
 time_frame_walks <- months(3) # length of the time frame for random walk term extraction
 
 walk_score <- 0.9 # Minimum normalized Random Walk Score for Random Walk Terms
+keep_seed_terms <- TRUE
 
 # user = readline(prompt = "Enter Heidelberg Username: ") # enter credentials in console
 # password = readline(prompt = "Enter Password: ") # user prompts for username and password, so the password is not visible in the script
@@ -51,7 +55,7 @@ walk_score <- 0.9 # Minimum normalized Random Walk Score for Random Walk Terms
 
 credentials <- readRDS("/data/koenigt/elastic_credentials.RDS")
 
-conn <- connect(
+conn <- elastic::connect(
   path = "",
   port = 9201,
   user = credentials$user,
@@ -59,7 +63,7 @@ conn <- connect(
   host = "localhost"
 )
 
-# conn$ping()
+conn$ping()
 
 
 #### Extract Seed Terms ####
@@ -73,7 +77,7 @@ committees <- read_csv("Seed_Accounts/committee_seeds_19-20_2023-04-06.csv", col
 
 # API call I (seed data)
 
-date_range <- tibble(until = Sys.Date(), from = until - time_frame_seeds)
+date_range <- tibble(until = date, from = until - time_frame_seeds)
 
 account_list <- ministries %>% bind_rows(committees) %>%
   filter(!is.na(user_id)) %>%
@@ -111,6 +115,10 @@ for (i in seq(1, length(account_list %>% distinct(user_id) %>% pull()), 100)) { 
   
 }
 
+# seed_tweets %>% 
+#   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
+#   vroom_write(file = paste0("regular_classification/seed_tweets_", 
+#                             date, ".csv.tar.gz"))
 
 # Tokenization, Lemmatization, Noun-Word Filtering
 
@@ -133,8 +141,10 @@ spacy_finalize() # end spacy
 
 
 ## save tokens
-
-vroom_write(seed_tokens, file = paste0("regular_classification/seed_tokens_", Sys.Date(), ".csv.tar.gz"))
+seed_tokens %>% 
+  mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
+  vroom_write(file = paste0("regular_classification/seed_tokens_", 
+                            date, ".csv.tar.gz"))
 
 
 ## NEs only
@@ -203,14 +213,15 @@ seed_terms_committees <- get_seed_terms(data = committee_NE,
 
 seed_terms_committee_members <- committee_NE %>% # split datasets into committees and calculate keyness within committees via map()
   split(.$committee) %>% 
-  map(\(data) get_seed_terms(data = data,
+  imap(\(data, id) get_seed_terms(data = data,
                            doc_id = "_id",
                            tokens = "lemma",
                            grouping_var = "official_name",
                            policy_field = "policy_field",
                            threshold = chi2_committee_members,
                            show_plots = F,
-                           save_plots = F)) %>% 
+                           save_plots = F) %>% 
+  mutate(committee = id)) %>% 
   rbindlist()
   
 
@@ -218,15 +229,15 @@ seed_terms_committee_members <- committee_NE %>% # split datasets into committee
 
 seed_terms_ministries %>% 
   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
-  vroom_write(file = paste0("regular_classification/seed_terms_ministries_", Sys.Date() ,".csv.tar.gz"), delim = ",")
+  vroom_write(file = paste0("regular_classification/seed_terms_ministries_", date ,".csv.tar.gz"), delim = ",")
 
 seed_terms_committees %>% 
   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
-  vroom_write(file = paste0("regular_classification/seed_terms_committees_", Sys.Date() ,".csv.tar.gz"), delim = ",")
+  vroom_write(file = paste0("regular_classification/seed_terms_committees_", date ,".csv.tar.gz"), delim = ",")
 
 seed_terms_committee_members %>% 
   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
-  vroom_write(file = paste0("regular_classification/seed_terms_committee_members_", Sys.Date() ,".csv.tar.gz"), delim = ",")
+  vroom_write(file = paste0("regular_classification/seed_terms_committee_members_", date ,".csv.tar.gz"), delim = ",")
 
 
 
@@ -236,7 +247,7 @@ seed_terms_committee_members %>%
 
 # API call II (random walk data)
 
-date_range <- tibble(until = Sys.Date(), from = until - time_frame_walks)
+date_range <- tibble(until = date, from = until - time_frame_walks)
 
 epinetz_accounts <- readRDS("EPINetz_full_collection_list_update_10.RDs") # list of all EPINetz Accounts
 
@@ -281,8 +292,9 @@ walk_tokens <-
 spacy_finalize() # end spacy
 
 ## save tokens
-
-vroom_write(walk_tokens, file = paste0("regular_classification/walk_tokens_", Sys.Date(), ".csv.tar.gz"))
+walk_tokens %>% 
+  mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
+  vroom_write(file = paste0("regular_classification/walk_tokens_", date, ".csv.tar.gz"))
 
 
 ## NEs only
@@ -292,81 +304,184 @@ walk_NE <- walk_tokens %>% as_tibble() %>%
   filter(lemma != "amp", lemma != "&amp", lemma != "RT", lemma != "rt") %>% 
   filter(!(tolower(lemma) %in% stopwords(language = "en")) & # drop stopwords
            !(tolower(lemma) %in% stopwords(language = "de"))) %>% 
-  filter(!str_detect(lemma, "@")) %>% # drop all lemmas containing "@" - that is, all mentions
-  filter(!str_detect(lemma, "http")) # drop all URLs
+  # filter(!str_detect(lemma, "@")) %>% # drop all lemmas containing "@" - that is, all mentions | mentions may be relevant for context
+  filter(!str_detect(lemma, "http")) %>%  # drop all URLs
+  mutate(lemma = tolower(lemma)) %>%  # set case to lower to ignore casing in networks
+  left_join(walk_tweets %>% distinct(`_id`, `_source.created_at`), 
+            join_by(doc_id == `_id`)) %>%  # add time
+  mutate(week = ceiling_date(as_datetime(`_source.created_at`), # make week indicator (last day of the week)
+                             unit = "week"))
 
 
 ## drop 10% percentile of counts
 walk_NE <- drop_quantile(walk_NE,
                          tokens = "lemma",
                          quantile = 0.1,
-                         ignore_case = TRUE, # case is ignored, but not modified
+                         ignore_case = FALSE, # case is already lowered
                          group = "tag",
                          verbose = T)
 
 # walk_NE <- walk_NE %>% mutate(lemma = case_when(!str_detect(lemma, "http") ~ tolower(lemma), # convert to lower,
 #                                                 .default = lemma)) # but preserve URLs as is (to not break twitter links)
 
-walk_NE <- walk_NE %>% mutate(lemma = tolower(lemma)) # set case to lower to ignore casing in networks
 
 # Prepare Network for Random Walks
 
-walk_network <- snapshots(walk_NE %>% mutate(time = "full"), # add dummy variable to calculate only 1 snapshot
-                          vertex_a = "doc_id",
-                          vertex_b = "lemma", 
-                          time = "time", 
-                          output = "networks",
-                          directed = F, 
-                          pmi_weight = T) %>% 
-  select(!time) %>%  # remove time dummy
-  # filter(weight > 0 ) %>% # remove edges with negative weight - not necessary, as negative weights are accepted by the random walk algorithm
-  graph_from_data_frame(directed = F) # make igraph object 
-
-
-multiplex <- create.multiplex(list(walk_network = walk_network)) # make multiplex object for random walks
-
-# {
-#   AdjMatrix <- compute.adjacency.matrix(multiplex) # make adjacency matrix
-#   gc() # this is important - the computation of the adjacency matrix is very costly and doesn't flush automatically!
-# }
-
-AdjMatrix <- compute.adjacency.matrix.mono(multiplex) # an efficient adjacency matrix implementation for monoplex networks
-
-AdjMatrixNorm <- normalize.multiplex.adjacency(AdjMatrix) # normalize the adjacency matrix
+walk_network <- make_multiplex_objects(walk_NE,
+                                       vertex_a = "doc_id",
+                                       vertex_b = "lemma",
+                                       directed = F,
+                                       pmi_weight = T,
+                                       keep_igraph_network = F,
+                                       keep_multiplex_network = T,
+                                       keep_adjacency_matrix = F,
+                                       keep_normalized_adjacency_matrix = T)
+  
 
 
 
 # Compute Random Walks
 
 seeds <- rbindlist(list(seed_terms_ministries, # bind seed terms of subsets together...
-                        seed_terms_committees, 
-                        seed_terms_committee_members),
+                        seed_terms_committees),
                    fill = TRUE) %>% 
+  anti_join(seed_terms_committee_members, # drop seed terms prevalent for single committee members
+            by = join_by(feature, committee)) %>% 
   filter(feature %in% walk_NE$lemma) %>% # drop seed terms not in the walk network
   split(.$policy_field)                        # ... and split by policy field
 
-rwr_results <- seeds %>% future_map(\(seed_group)
-                                    seed_group$feature %>%
-                                      map(\(seed)
-                                          tryCatch( # capture non-standard errors thrown by Random.Walk.Restart.Multiplex
-                                            Random.Walk.Restart.Multiplex(
-                                              x = AdjMatrixNorm,
-                                              MultiplexObject = multiplex,
-                                              Seeds = seed
-                                            ), 
-                                            error  = function(e) NULL) # return NULL for errors...
-                                          ) %>% compact(), # ... and remove NULLs
-                                    .progress = T) 
+# rwr_results <- seeds %>% future_map(\(seed_group)
+#                                     seed_group$feature %>%
+#                                       map(\(seed)
+#                                           tryCatch( # capture non-standard errors thrown by Random.Walk.Restart.Multiplex
+#                                             Random.Walk.Restart.Multiplex(
+#                                               x = AdjMatrixNorm,
+#                                               MultiplexObject = multiplex,
+#                                               Seeds = seed
+#                                             ), 
+#                                             error  = function(e) NULL) # return NULL for errors...
+#                                           ) %>% compact(), # ... and remove NULLs
+#                                     .progress = T) 
+# 
+# flattened_results <- rwr_results %>%
+#   list_flatten(name_spec = "{outer}") %>%
+#   future_imap(\(x, idx)
+#     tibble(x[[1]], seed_node = x[[2]], policy_field = idx) %>% 
+#       mutate(ScoreNorm = rescale(Score, to = c(0, 1))), # rescale scores
+#   .progress = T) %>% 
+#   rbindlist() %>% 
+#   filter(ScoreNorm >= walk_score)
 
-flattened_results <- rwr_results %>%
-  list_flatten(name_spec = "{outer}") %>%
-  future_imap(\(x, idx)
-    tibble(x[[1]], seed_node = x[[2]], policy_field = idx) %>% 
-      mutate(ScoreNorm = rescale(Score, to = c(0, 1))), # rescale scores
-  .progress = T) %>% 
-  rbindlist() %>% 
-  filter(ScoreNorm >= walk_score)
+walk_terms <- get_rwr_terms(walk_network,
+                            network_name = NULL,
+                            seeds = seeds, 
+                            seed_var = "feature",
+                            match_var = NULL,
+                            flatten_results = TRUE,
+                            walk_score = walk_score,
+                            keep_seed_terms = keep_seed_terms,
+                            progress = FALSE) 
 
-vroom_write(flattened_results, file = paste0("regular_classification/walk_terms_", Sys.Date(), ".csv.tar.gz"))
+    ## The terms returned include duplicates, esp. seed terms with keep_seed_terms = TRUE
+
+
+## calculate means, re-normalize
+walk_terms_means <- walk_terms %>% 
+  summarise(mean_score = mean(ScoreNorm), 
+            .by = c(NodeNames, policy_field, seed_term)) %>% 
+  group_by(policy_field, seed_term) %>% 
+  mutate(mean_score_norm = case_when(seed_term == TRUE ~ 1,  # score of 1 for seed terms
+                                     seed_term == FALSE ~ rescale(mean_score))) %>% # rescaling for all other terms
+  ungroup()
+
+
+## save
+walk_terms_means %>% 
+  mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
+  vroom_write(file = paste0("regular_classification/walk_terms_", 
+                            date, ".csv.tar.gz"), append = F)
+  
+
+
+#### Classify Documents ####
+### this is a testing workflow that requires modification for the live API 
+###  live API calls would load the term data to classify documents as needed
+
+# API call III (live data)
+
+date_range <- tibble(until = date + days(7), from = date + days(1))
+
+epinetz_accounts <- readRDS("EPINetz_full_collection_list_update_10.RDs") # list of all EPINetz Accounts
+
+account_list <- epinetz_accounts %>% # currently, this considers tweets of all accounts in the observation period, regardless of incumbency. This may change in the future
+  filter(!is.na(user_id)) # drop entries without user IDs
+
+
+classification_tweets <- tibble() # data container
+
+for (i in seq(1, length(account_list %>% distinct(user_id) %>% pull()), 100)) { # the search query needs to be chopped up into smaller bits (100 accounts per chunk)
+  
+  dat <- na.omit((account_list %>% distinct(user_id) %>% pull())[i:(i+(100-1))]) # account chunks of 100 each 
+  
+  # make query:
+  q <- paste0("created_at:[\"", date_range$from, "T00:00:00Z\" TO \"", date_range$until, "T00:00:00Z\"] AND author_id:(", # timeframe
+              paste(dat, collapse = " OR "), ")") # Accounts in the EPINetz List only
+  
+  tweets <- full_scroll(conn, q = q, index = "twitter_v2_tweets")
+  
+  classification_tweets <- bind_rows(classification_tweets, tweets)
+  
+}
+
+
+# Tokenization, Lemmatization, Noun-Word Filtering
+
+classification_corpus <- corpus(classification_tweets, docid_field = "_id", text_field = "_source.text", 
+                      meta = list(names(classification_tweets)), # preserve all vars as metadata
+                      unique_docnames = T) # we could also use the conversation IDs to treat conversations as single documents
+
+spacy_initialize(model = "de_core_news_lg") # start python spacy
+
+classification_tokens <-
+  spacy_parse(
+    classification_corpus,
+    pos = T,
+    tag = T,
+    lemma = T,
+    entity = T
+  )
+
+spacy_finalize() # end spacy
+
+## save tokens
+classification_tokens %>% 
+  mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
+  vroom_write(file = paste0("regular_classification/classification_tokens_", date, ".csv.tar.gz"))
+
+
+
+# Classify Documents
+classification_terms <- classification_tokens %>% 
+  mutate(lemma = tolower(lemma)) %>% # lemmas to lower case
+  semi_join(walk_terms_means, # filter for lemmas in the walk terms (this saves all additional pre-processing)
+            join_by(lemma == NodeNames)) %>% 
+  left_join(walk_terms_means %>% distinct(NodeNames, mean_score_norm, policy_field),
+            join_by(lemma == NodeNames), # add classification attributes
+            relationship = "many-to-many") # multi-matches for a) terms in multiple docs, b) terms in multiple policy fields
+
+classified_documents <- classification_terms %>% 
+  summarize(policy_score = sum(mean_score_norm), .by = c(doc_id, policy_field)) %>% # sum policy scores by field and document
+  complete(doc_id, policy_field, fill = list(policy_score = 0)) %>% # fill missing values
+  mutate(policy_score_norm = policy_score/sum(policy_score), .by = doc_id) # and normalize between 0 and 1
+  
+
+# Check highest ranking policy fields for tweets (quality control)
+top_field_tweets <- classification_tweets %>% 
+  left_join(classified_documents %>% 
+              slice_max(policy_score_norm, by = doc_id, with_ties = F), 
+            join_by(`_id` == doc_id)) %>% 
+  select(`_id`, `_source.text`, policy_field, policy_score_norm, policy_score)
+  
+
 
 plan(sequential) # end multisession

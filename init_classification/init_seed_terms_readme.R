@@ -30,11 +30,7 @@ init_seed_terms_ministries <- vroom("init_classification/seed_terms_ministries.c
 
 init_seed_terms_committees <- vroom("init_classification/seed_terms_committees.csv.tar.gz") # this data has column pre-specified
 
-init_seed_terms_committee_members <- vroom("init_classification/seed_terms_committee_members.csv.tar.gz", 
-                                    col_names = c("feature", "chi2", "p", # colnames need to be specified during read-in
-                                                  "n_target", "n_reference", 
-                                                  "official_name", "policy_field", 
-                                                  "period"))
+init_seed_terms_committee_members <- vroom("init_classification/seed_terms_committee_members.csv.tar.gz") # this data has column pre-specified
 
 ## All Plots are available in the respective folder under init_classification/
 ## => can be downloaded and viewed (this should be easier than loading them into R)

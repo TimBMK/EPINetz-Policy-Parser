@@ -19,15 +19,16 @@ options(future.globals.maxSize = (100000*1024^2)) # 10 gb Max Size for Paralleli
 
 # source("/data/koenigt/Tools-Scripts/Tools & Scripts/network_snapshots.R") # single snapshot function included in utils_networks.R
 
-source("utils_networks.R")
+source("get_rwr_terms.R")
 
 source("utils_text_processing.R")
 
 cat("\n ======= Preparations ======= \n")
 
 # plan(multisession, workers = 4) # start multisession (for mapping processes) - Multisession for R Studio Sessions
-plan(multicore, workers = 2) # start multisession (for mapping processes) - ! DO NOT USE MULTICORE IN RSTUDIO SESSION. ONLY WHEN CALLING THE SCRIPT DIRECTLY !
-                              # !!multicore plans can be unstable!!
+# plan(multicore, workers = 4) # start multisession (for mapping processes) - ! DO NOT USE MULTICORE IN RSTUDIO SESSION. ONLY WHEN CALLING THE SCRIPT DIRECTLY !
+#                               # !!multicore plans can be unstable!!
+
 
 
 walk_score = 0.5 # cutoff value for normalized random walk score
@@ -44,11 +45,7 @@ seed_terms_ministries <- vroom("init_classification/seed_terms_ministries.csv.ta
 
 seed_terms_committees <- vroom("init_classification/seed_terms_committees.csv.tar.gz") # this data has columns pre-specified
 
-seed_terms_committee_members <- vroom("init_classification/seed_terms_committee_members.csv.tar.gz", 
-                                           col_names = c("feature", "chi2", "p", # colnames need to be specified during read-in
-                                                         "n_target", "n_reference", 
-                                                         "official_name", "policy_field", 
-                                                         "period"))
+seed_terms_committee_members <- vroom("init_classification/seed_terms_committee_members.csv.tar.gz") # this data has columns pre-specified
 
 
 # read data
@@ -85,7 +82,7 @@ walk_NE <- walk_tokens %>% as_tibble() %>%
   mutate(lemma = tolower(lemma)) %>%  # set case to lower to ignore casing in networks
   left_join(walk_tweets %>% distinct(`_id`, `_source.created_at`), 
             join_by(doc_id == `_id`)) %>%  # add time
-  mutate(week = ceiling_date(`_source.created_at`, # make week indicator (last day of the week)
+  mutate(week = ceiling_date(as_datetime(`_source.created_at`), # make week indicator (last day of the week)
                              unit = "week"))
 gc()
 
@@ -98,7 +95,7 @@ cat("\n ======= Make List of Timeframes ======= \n")
 dat_list <- future_map(walk_NE$week %>% unique(),
                        ~ {
                          walk_NE %>% 
-                           filter(week >= (.x - period(3, "months")) & # beginning: 3 month before
+                           filter(week >= (.x - weeks(12)) & # beginning: 12 weeks (3 months) before
                                     week <= .x)          # end: week of interest
                        })
 
@@ -139,92 +136,121 @@ gc()
 #                                                 .default = lemma)) # but preserve URLs as is (to not break twitter links)
 
 
+# Housekeeping #
+cat("\n ====== Remove unneeded Objects =======  \n")
+
+rm(walk_tokens)
+rm(walk_NE)
+rm(walk_tweets)
+
+gc()
+
 # Prepare Network for Random Walks
 
 cat("\n ======= Make Networks for Random Walks ======= \n")
 
+plan(sequential) # no multisession - seems unstable for certain processes here, such as making the networks
+
 walk_networks <- dat_list %>% 
-  future_imap(\(dat, datname)
-              
-              {
-                network <- calculate_network(
-                  dat,
-                  vertex_a = "doc_id",
-                  vertex_b = "lemma",
-                  directed = F,
-                  pmi_weight = T,
-                  as_data_frame = F # return as igraph object
-                ) 
-                
-                multiplex <-
-                  create.multiplex(list(network = network)) # make multiplex object for random walks,
-                
-                AdjMatrix <- compute.adjacency.matrix.mono(multiplex)
-                
-                AdjMatrixNorm <-
-                  normalize.multiplex.adjacency(AdjMatrix)
-                
-                return(list(multiplex = multiplex, 
-                            AdjMatrix = AdjMatrix, 
-                            AdjMatrixNorm = AdjMatrixNorm))
-  },
-  
-  .progress = F)
+  future_map(\(dat)
+             make_multiplex_objects(dat,
+                                    vertex_a = "doc_id",
+                                    vertex_b = "lemma",
+                                    directed = F,
+                                    pmi_weight = T,
+                                    keep_igraph_network = F,
+                                    keep_multiplex_network = T,
+                                    keep_adjacency_matrix = F,
+                                    keep_normalized_adjacency_matrix = T),
+             .progress = F)
 
 gc()
+
+
+# Housekeeping #
+cat("\n ====== Remove unneeded Objects =======  \n")
+
+rm(dat_list)
+
+gc()
+
 
 # Compute Random Walks
 
 cat("\n ======= Compute Random Walks ======= \n")
 
+# plan(multicore, workers = 4) # restart multisession (for mapping processes) 
+
 seeds <- rbindlist(list(seed_terms_ministries, # bind seed terms of subsets together...
-                        seed_terms_committees, 
-                        seed_terms_committee_members),
+                        seed_terms_committees),
                    fill = TRUE) %>% 
+  anti_join(seed_terms_committee_members, by = join_by(feature, period, committee)) %>% # drop seed terms prevalent for single committee members
   filter(feature %in% walk_NE$lemma) %>% # drop seed terms not in the walk network
   split(.$policy_field)                        # ... and split by policy field
 
 
 
 walk_networks %>% 
-  future_iwalk(\(walk_network, network_name)
-               {
-                 rwr_results <- seeds %>% map(\(seed_group)
-                                              seed_group %>% 
-                                                filter(period == ymd(network_name)) %>% # same period as seeds
-                                                distinct(feature) %>% pull() %>% 
-                                                map(\(seed)
-                                                    tryCatch( # capture non-standard errors thrown by Random.Walk.Restart.Multiplex
-                                                      Random.Walk.Restart.Multiplex(
-                                                        x = walk_network$AdjMatrixNorm,
-                                                        MultiplexObject = walk_network$multiplex,
-                                                        Seeds = seed
-                                                      ), 
-                                                      error  = function(e) NULL) # return NULL for errors...
-                                                ) %>% compact() # ... and remove NULLs
-                 ) 
-                 
-                 flattened_results <- rwr_results %>%
-                   list_flatten(name_spec = "{outer}") %>%
-                   imap(\(x, idx)
-                        tibble(x[[1]], seed_node = x[[2]], policy_field = idx) %>% 
-                          mutate(ScoreNorm = rescale(Score, to = c(0, 1))), # rescale scores
-                        .progress = F) %>% 
-                   rbindlist() %>% 
-                   mutate(period = network_name) %>% 
-                   group_by(policy_field) %>% 
-                   mutate(seed_term = case_when( # mark seed terms of the policy field
-                     NodeNames %in% seed_node ~ TRUE, .default = FALSE)) %>% 
-                   filter(ScoreNorm >= walk_score |  # drop results below the desired (normalized) walk score
-                            seed_term == keep_seed_terms) %>%   # but retain seed terms if desired
-                   ungroup()
-                 
-                 flattened_results %>% 
-                   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
-                   vroom_write(file = paste0("init_classification/walk_terms/", 
-                                             network_name, ".csv"), append = F)
+  iwalk(\(walk_network, network_name)
+        {
+          get_rwr_terms(walk_network,
+                        network_name = network_name,
+                        seeds = seeds, 
+                        seed_var = "feature",
+                        match_var = "period",
+                        flatten_results = TRUE,
+                        walk_score = walk_score,
+                        keep_seed_terms = keep_seed_terms,
+                        progress = FALSE) %>% 
+            # write results to disk rather than saving them in the environment
+            mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
+            vroom_write(file = paste0("init_classification/walk_terms/",
+                                      network_name, ".csv"), append = F)
+          
+          ## old way, before wrapping into a dedicated function:
+          # rwr_results <- seeds %>% map(\(seed_group)
+          #                              seed_group %>% 
+          #                                filter(period == ymd(network_name)) %>% # same period as seeds
+          #                                distinct(feature) %>% pull() %>% 
+          #                                map(\(seed)
+          #                                    tryCatch( # capture non-standard errors thrown by Random.Walk.Restart.Multiplex
+          #                                      Random.Walk.Restart.Multiplex(
+          #                                        x = walk_network$AdjMatrixNorm,
+          #                                        MultiplexObject = walk_network$multiplex,
+          #                                        Seeds = seed
+          #                                      ), 
+          #                                      error  = function(e) NULL) # return NULL for errors...
+          #                                ) %>% compact() # ... and remove NULLs
+          # ) 
+          # 
+          # flattened_results <- rwr_results %>%
+          #   list_flatten(name_spec = "{outer}") %>%
+          #   imap(\(x, idx)
+          #        tibble(x[[1]], seed_node = x[[2]], policy_field = idx) %>% 
+          #          mutate(ScoreNorm = rescale(Score, to = c(0, 1))), # rescale scores
+          #        .progress = F) %>% 
+          #   rbindlist() %>% 
+          #   mutate(period = network_name) %>% 
+          #   group_by(policy_field) %>% 
+          #   mutate(seed_term = case_when( # mark seed terms of the policy field
+          #     NodeNames %in% seed_node ~ TRUE, .default = FALSE)) %>% 
+          #   filter(ScoreNorm >= walk_score |  # drop results below the desired (normalized) walk score
+          #            seed_term == keep_seed_terms) %>%   # but retain seed terms if desired
+          #   ungroup()
+          # 
+          # flattened_results %>% 
+          #   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
+          #   vroom_write(file = paste0("init_classification/walk_terms/", 
+          #                             network_name, ".csv"), append = F)
+
   }, .progress = F)
 
 gc()
+
+walk_terms <- lapply(list.files("init_classification/walk_terms/", 
+                                full.names = T), vroom) %>% rbindlist()
+
+walk_terms %>% mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
+  vroom_write(file = "init_classification/init_walk_terms.csv.tar.gz", delim = ",")
 
 plan(sequential)

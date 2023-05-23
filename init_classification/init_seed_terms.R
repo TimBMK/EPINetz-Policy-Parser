@@ -247,7 +247,7 @@ dat_list %>%
                                               save_plots = T)) 
                  dat %>% iwalk(\(y, idy)
                                {
-                                 y %>% .[[1]] %>% mutate(period = idx) %>%
+                                 y %>% .[[1]] %>% mutate(period = idx, committee = idy) %>%
                                    mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
                                    vroom_write(file = "init_classification/seed_terms_committee_members.csv.tar.gz", append = T)
                                  
