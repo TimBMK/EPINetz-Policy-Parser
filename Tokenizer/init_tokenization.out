@@ -1,0 +1,37 @@
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ dplyr     1.1.1     ✔ readr     2.1.4
+✔ forcats   1.0.0     ✔ stringr   1.5.0
+✔ ggplot2   3.4.2     ✔ tibble    3.2.1
+✔ lubridate 1.9.2     ✔ tidyr     1.3.0
+✔ purrr     1.0.1     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+Package version: 3.2.1
+Unicode version: 13.0
+ICU version: 66.1
+Parallel computing: 32 of 32 threads used.
+See https://quanteda.io for tutorials and examples.
+
+Attaching package: ‘data.table’
+
+The following objects are masked from ‘package:lubridate’:
+
+    hour, isoweek, mday, minute, month, quarter, second, wday, week,
+    yday, year
+
+The following objects are masked from ‘package:dplyr’:
+
+    between, first, last
+
+The following object is masked from ‘package:purrr’:
+
+    transpose
+
+Found 'spacy_condaenv'. spacyr will use this environment
+successfully initialized (spaCy Version: 3.1.3, language model: de_core_news_lg)
+(python options: type = "condaenv", value = "spacy_condaenv")
+Warning message:
+In spacy_parse.character(corpus, pos = T, tag = T, lemma = T, entity = T) :
+  lemmatization may not work properly in model 'de_core_news_lg'

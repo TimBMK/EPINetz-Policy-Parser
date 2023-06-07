@@ -1,0 +1,172 @@
+### Update Tokens ###
+#####################
+
+### run this regularly to keep the tokens database up-to-date
+
+{
+  library(tidyverse)
+  library(elastic)
+  library(quanteda)
+  library(spacyr)
+  library(data.table)
+  library(vroom)
+}
+
+source("/data/koenigt/Tools-Scripts/Tools & Scripts/elasticsearch_scrolledsearch.R") # scrolled search function
+
+# connect to Heidelberg Database via Tunnel. In Bash, use:
+# ssh -L 9201:erinome.ifi.uni-heidelberg.de:9200 USERNAME@adrastea.ifi.uni-heidelberg.de
+
+credentials <- readRDS("/data/koenigt/elastic_credentials.RDS")
+
+conn <- connect(
+  path = "",
+  port = 9201,
+  user = credentials$user,
+  pwd = credentials$password,
+  host = "localhost"
+)
+
+# conn$ping() # check connection
+
+
+# Read database
+
+epinetz_list <- readRDS("EPINetz_full_collection_list_update_11.RDS")
+
+# committees <- read_csv("Seed_Accounts/committee_seeds_19-20_2023-04-06.csv", col_types = list(user_id = "c")) # only necessary for min date
+
+
+# load existing tweets
+
+files <- list.files("Tokenizer")
+
+if ("tokens.csv.tar.gz" %in% files) { # check for latest tokens file and load
+  
+  init_tokens <- vroom(file = "Tokenizer/tokens.csv.tar.gz",
+                       # Important! specify coltypes to preserve correct IDs
+                       col_types = list(
+                         doc_id = "c"
+                       ))
+  
+  
+} else { # else, fall back to initial tokenization
+  
+  init_tokens <- vroom(file = file.path("Tokenizer", files[str_detect(files, "tokens_init")]),
+                       # Important! specify coltypes to preserve correct IDs
+                       col_types = list(
+                         doc_id = "c"
+                       ))
+  
+}
+
+
+#### API call ####
+
+get_replies <- TRUE
+
+start_date <- Sys.Date() - years(1) # minimum Date: One year back (max Range for Policy Parser (Seed Terms))
+# start_date <- min(committees$begin) # minimum Date: beginning of the first WP of interest
+
+account_list <- epinetz_list %>% 
+  filter(!is.na(user_id)) %>% 
+  distinct(user_id)
+
+
+# Get all Tweet IDs for one year (more efficiant than getting full tweets)
+
+all_ids <- tibble() # data container
+
+for (i in seq(1, length(account_list %>% distinct(user_id) %>% pull()), 100)) { # the search query needs to be chopped up into smaller bits (100 accounts per chunk)
+  
+  cat(paste("Rows", i, "to", i+(100-1), "\n"))
+  
+  dat <- na.omit((account_list %>% distinct(user_id) %>% pull())[i:(i+(100-1))]) # account chunks of 100 each 
+  
+  # make query:
+  if (get_replies == TRUE) {
+    q <- paste0("created_at:[\"", start_date, "T00:00:00Z\" TO *] AND author_id:(", # timeframe with * as wildcard (no end date)
+                paste(dat, collapse = " OR "), ")") # Accounts in the Seed Account List only
+  }
+  
+  if (get_replies == FALSE) {
+    q <- paste0("created_at:[\"", start_date, "T00:00:00Z\" TO *] AND author_id:(", # timeframe with * as wildcard (no end date)
+                paste(dat, collapse = " OR "), ") NOT in_reply_to_user_id:*") # Accounts in the Seed Account List only
+  }
+  
+  res <- full_scroll(conn, q = q, index = "twitter_v2_tweets", source = F) # get the Tweet IDs
+  
+  all_ids <- bind_rows(all_ids, res)
+  
+}
+
+
+# Check which tweets are not yet tokenized
+new_ids <- all_ids %>% anti_join(init_tokens %>% distinct(doc_id), 
+                                      by = join_by(`_id` == doc_id))
+
+
+# Get full tweets
+
+new_tweets <- tibble() # data container
+
+for (i in seq(1, length(new_ids %>% distinct(`_id`) %>% pull()), 100)) { # the search query needs to be chopped up into smaller bits (100 IDs per chunk)
+  
+  # cat(paste("Rows", i, "to", i+(100-1), "\n"))
+  
+  dat <- na.omit((new_ids %>% distinct(`_id`) %>% pull())[i:(i+(100-1))]) # ID chunks of 100 each 
+  
+  # make query:
+  q <- paste0("_id:(", paste(dat, collapse = " OR "), ")")
+  
+  res <- Search(conn, q =  q, index = "twitter_v2_tweets", source = NULL, asdf = T, size = 10000)# get the full Tweets 
+  
+  new_tweets <- bind_rows(new_tweets, res$hits$hits)
+  
+}
+
+# add reply indicator
+new_tweets <- new_tweets %>% mutate(is_reply = case_when(!is.na(`_source.in_reply_to_user_id`) ~ TRUE,
+                                                         .default = FALSE))
+
+
+
+#### Tokenize ####
+
+corpus <- corpus(new_tweets, docid_field = "_id", text_field = "_source.text", 
+                 meta = list(names(new_tweets)), # preserve all vars as metadata
+                 unique_docnames = T) # we could also use the conversation IDs to treat conversations as single documents
+
+spacy_initialize(model = "de_core_news_lg") # start python spacy
+
+tokens <-
+  spacy_parse(
+    corpus,
+    pos = T,
+    tag = T,
+    lemma = T,
+    entity = T
+  )
+
+spacy_finalize() # end spacy
+
+
+# add reply indicator, creation date and author account ID
+tokens <- tokens %>%
+  left_join(new_tweets %>% 
+              distinct(`_id`, is_reply, 
+                       `_source.created_at`, 
+                       `_source.author_id`), 
+            by = join_by(doc_id == `_id`)) %>% 
+  mutate(`_source.created_at` = as_datetime(`_source.created_at`))
+
+
+# add to existing tokens & save
+rbindlist(list(init_tokens, tokens)) %>% # bind together
+  distinct(doc_id, sentence_id, token_id, token, .keep_all = TRUE) %>% # double-check duplicates
+  mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
+  vroom_write(file = "Tokenizer/tokens.csv.tar.gz", delim = ",")
+
+
+
+
