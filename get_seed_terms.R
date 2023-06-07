@@ -14,18 +14,22 @@ get_seed_terms <- function(data,              # dataframe containing tokens, gro
                            save_plots = FALSE)      # should the plots be saved and returned with the keyterm data?
 {
   require(dplyr)
+  require(purrr)
   require(quanteda)
   require(quanteda.textstats)
   require(quanteda.textplots)
   
   # prepare corpus
+  
   if(!is.null(doc_id)) {
     corpus <- data %>% 
       dplyr::summarise(text = paste(!!as.name(tokens), collapse = " "), .by = c(!!as.name(doc_id), !!as.name(grouping_var))) %>% # not strictly necessary, but speeds up computation
-      quanteda::corpus(text_field = "text") # as no docid is given, they are generated, allowing for duplicates (i.e. same tweet in multiple fields)
+      dplyr::mutate(temp_id = 1:nrow(.)) %>% # generate a temporary ID to allow for duplicates (i.e. same tweet in multiple fields)
+      quanteda::corpus(text_field = "text", docid_field = "temp_id") 
   } else { # if no doc_id is given, each row becomes a document
     corpus <- data %>% 
-      quanteda::corpus(text_field = tokens) # as no docid is given, they are generated, allowing for duplicates (i.e. same tweet in multiple fields)
+      dplyr::mutate(temp_id = 1:nrow(.)) %>% # generate a temporary ID to allow for duplicates (i.e. same tweet in multiple fields)
+      quanteda::corpus(text_field = "text", docid_field = "temp_id") 
   }
   
   # prepare DFM (incl. grouping and stopword removal)
