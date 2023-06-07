@@ -91,23 +91,23 @@ committee_NE <- committee_tweets %>%
 
   # min <- date_range$from + years(1) # do not go back behind the first LP (for committees) -- only necessary for data ranging beyond the LP (then, only ministry data could be used)
 
-dat_list <- future_map(ceiling_date(seed_tweets$`_source.created_at`, 
+dat_list <- future_map(ceiling_date(as_datetime(seed_tweets$`_source.created_at`), 
                                     unit = "week") %>% unique(),
-                   ~ {
-                     # ministry_tweets %>% mutate(type = "ministry") %>%                # ministry + committee tweets combined ... ! only necessary for min date filtering
-                     #   bind_rows(committee_tweets %>% mutate(type = "committee")) %>% # ... with indicator for filtering ...
-                     #   distinct(`_id`, .keep_all = T) %>% # ... and dropped  duplicates
-                     # select(`_id`, `_source.created_at`, type) %>% 
-                     seed_tweets %>% 
-                       select(`_id`, `_source.created_at`) %>% 
-                       mutate(week = ceiling_date(`_source.created_at`, 
-                                                  unit = "week")) %>% # make week indicator (last day of the week)
-                       filter(week >= (.x - years(1)) & # beginning: 1 year before
-                                week <= .x)             # end: week of interest
-                       # filter(!(type == "committee" & `_source.created_at` <= min)) # committees only after min date (before: only ministries) -- only necessary for data ranging beyond the LP 
-                   })
+                       ~ {
+                         # ministry_tweets %>% mutate(type = "ministry") %>%                # ministry + committee tweets combined ... ! only necessary for min date filtering
+                         #   bind_rows(committee_tweets %>% mutate(type = "committee")) %>% # ... with indicator for filtering ...
+                         #   distinct(`_id`, .keep_all = T) %>% # ... and dropped  duplicates
+                         # select(`_id`, `_source.created_at`, type) %>% 
+                         seed_tweets %>% 
+                           select(`_id`, `_source.created_at`) %>% 
+                           mutate(week = ceiling_date(as_datetime(`_source.created_at`), 
+                                                      unit = "week")) %>% # make week indicator (last day of the week)
+                           filter(week >= (.x - years(1)) & # beginning: 1 year before
+                                    week <= .x)             # end: week of interest
+                         # filter(!(type == "committee" & `_source.created_at` <= min)) # committees only after min date (before: only ministries) -- only necessary for data ranging beyond the LP 
+                       })
 
-names(dat_list) <- ceiling_date(seed_tweets$`_source.created_at`, 
+names(dat_list) <- ceiling_date(as_datetime(seed_tweets$`_source.created_at`), 
                                 unit = "week") %>% 
   unique() # name the dataframes in the list
 

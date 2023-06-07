@@ -74,9 +74,10 @@ walk_tokens <- vroom("init_classification/tokens_init_walk_2023-04-10.csv.tar.gz
 walk_NE <- walk_tokens %>% as_tibble() %>% 
   filter(tag == "NE" | tag == "NN") %>% # Noun words and NEs only
   filter(str_length(lemma) > 1) %>% # drop very short tokens, e.g. wrongly classified "#"
-  filter(lemma != "amp", lemma != "&amp", lemma != "RT", lemma != "rt") %>% 
+  filter(lemma != "amp", lemma != "&amp", lemma != "RT", lemma != "rt", lemma != "--", lemma != "---") %>% 
   filter(!(tolower(lemma) %in% stopwords(language = "en")) & # drop stopwords
-           !(tolower(lemma) %in% stopwords(language = "de"))) %>% 
+           !(tolower(lemma) %in% stopwords(language = "de")) &
+           !(tolower(lemma) %in% stopwords(language = "fr"))) %>% 
   filter(!str_detect(lemma, "@")) %>% # drop all lemmas containing "@" - that is, all mentions
   filter(!str_detect(lemma, "http")) %>%  # drop all URLs
   mutate(lemma = tolower(lemma)) %>%  # set case to lower to ignore casing in networks
@@ -140,7 +141,6 @@ gc()
 cat("\n ====== Remove unneeded Objects =======  \n")
 
 rm(walk_tokens)
-rm(walk_NE)
 rm(walk_tweets)
 
 gc()
@@ -167,17 +167,10 @@ walk_networks <- dat_list %>%
 gc()
 
 
-# Housekeeping #
-cat("\n ====== Remove unneeded Objects =======  \n")
 
-rm(dat_list)
+# Make Seedlist
 
-gc()
-
-
-# Compute Random Walks
-
-cat("\n ======= Compute Random Walks ======= \n")
+cat("\n ======= Make Seedlist ======= \n")
 
 # plan(multicore, workers = 4) # restart multisession (for mapping processes) 
 
@@ -186,16 +179,29 @@ seeds <- rbindlist(list(seed_terms_ministries, # bind seed terms of subsets toge
                    fill = TRUE) %>% 
   anti_join(seed_terms_committee_members, by = join_by(feature, period, committee)) %>% # drop seed terms prevalent for single committee members
   filter(feature %in% walk_NE$lemma) %>% # drop seed terms not in the walk network
+  distinct(feature, policy_field, period) %>% # drop features duplicated within policy fields (from committees etc)
   split(.$policy_field)                        # ... and split by policy field
 
 
+# Housekeeping #
+cat("\n ====== Remove unneeded Objects =======  \n")
+
+rm(dat_list)
+rm(walk_NE)
+
+gc()
+
+
+# Compute Random Walks
+
+cat("\n ======= Compute Random Walks ======= \n")
 
 walk_networks %>% 
   iwalk(\(walk_network, network_name)
         {
           get_rwr_terms(walk_network,
                         network_name = network_name,
-                        seeds = seeds, 
+                        seeds = seeds,
                         seed_var = "feature",
                         match_var = "period",
                         flatten_results = TRUE,

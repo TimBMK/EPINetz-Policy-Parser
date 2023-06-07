@@ -49,6 +49,8 @@ committees <- read_csv("Seed_Accounts/committee_seeds_19-20_2023-04-06.csv", col
 
 # API call
 
+get_replies <- TRUE
+
 date_range <- tibble(until = ymd("2023-04-10"), from = min(committees$begin)) # from beginning of first WP until 10th of April 2023
 
 account_list <- ministries %>% bind_rows(committees) %>% 
@@ -62,8 +64,15 @@ for (i in seq(1, length(account_list %>% distinct(user_id) %>% pull()), 100)) { 
   dat <- na.omit((account_list %>% distinct(user_id) %>% pull())[i:(i+(100-1))]) # account chunks of 100 each 
   
   # make query:
-  q <- paste0("created_at:[\"", date_range$from, "T00:00:00Z\" TO \"", date_range$until, "T00:00:00Z\"] AND author_id:(", # timeframe
-              paste(dat, collapse = " OR "), ")") # Accounts in the EPINetz List only
+  if (get_replies == TRUE) {
+    q <- paste0("created_at:[\"", date_range$from, "T00:00:00Z\" TO \"", date_range$until, "T00:00:00Z\"] AND author_id:(", # timeframe
+                paste(dat, collapse = " OR "), ")") # Accounts in the Seed Account List only
+  }
+  
+  if (get_replies == FALSE) {
+    q <- paste0("created_at:[\"", date_range$from, "T00:00:00Z\" TO \"", date_range$until, "T00:00:00Z\"] AND author_id:(", # timeframe
+                paste(dat, collapse = " OR "), ") NOT in_reply_to_user_id:*") # Accounts in the Seed Account List only
+  }
   
   tweets <- full_scroll(conn, q = q, index = "twitter_v2_tweets")
   
