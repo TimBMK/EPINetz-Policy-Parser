@@ -205,6 +205,8 @@ walk_networks %>%
                         seed_var = "feature",
                         match_var = "period",
                         flatten_results = TRUE,
+                        normalize_score = TRUE,
+                        positive_scores_only = TRUE,
                         walk_score = walk_score,
                         keep_seed_terms = keep_seed_terms,
                         progress = FALSE) %>% 
