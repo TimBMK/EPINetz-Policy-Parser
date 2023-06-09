@@ -23,7 +23,7 @@ source("utils_text_processing.R") # text processing utils
 
 source("get_rwr_terms.R") # random walk functions
 
-plan(multisession, workers = 4) # set up future multisession for future_map functions
+plan(multisession, workers = 16) # set up future multisession for future_map functions
 
 chi2_ministries <- 500 # set chi^2 threshold for ministries
 chi2_committee_members <- 250 # set chi^2 threshold for within-committee members
@@ -228,7 +228,8 @@ walk_terms <- get_rwr_terms(walk_network,
                             seed_var = "feature",
                             match_var = NULL,
                             flatten_results = TRUE,
-                            normalize_score = TRUE,
+                            group_name = "policy_field",
+                            normalize_score = "seeds",
                             positive_scores_only = TRUE,
                             walk_score = walk_score,
                             keep_seed_terms = keep_seed_terms,

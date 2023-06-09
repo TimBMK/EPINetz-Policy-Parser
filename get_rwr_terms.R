@@ -1,11 +1,12 @@
 get_rwr_terms <- function(walk_network, # an object made by make_multiplex_objects, contatining the multiplex network and the Normalized Adjacency Matrix
-                          network_name = NULL, # name of the network, used for matching the match_var. Usually the index when implented in imap functions. NULL to skip Requires match_var
+                          network_name = NULL, # name of the network, used for matching the match_var. Usually the index when implented in imap functions. NULL to skip. Requires match_var
                           seeds, # a list of dataframes, where each entry represents a specific group of seeds, e.g. a single policy field
                           seed_var, # the variable in the seed dataframes containing the seed terms
                           match_var = NULL, # the variable in the seed dataframes to match on the network_name variable, e.g. specific time periods. NULL to skip. Requires network_name
                           flatten_results = TRUE, # should the results be flattened into a single dataframe (with policy_field indicator) or a list of one dataframe per group? 
+                          group_name = "policy_field", # name of the grouping variable if flatten_results = TRUE
                           positive_scores_only = FALSE, # should negative Walk Scores (i.e. very unlikely connection due to negative weights) and 0 scores be dropped? Applied before normalization
-                          normalize_score = FALSE, # Should scores be normalized? If TRUE, walk_scores will be normalized for each group of seeds (e.g. within each policy field). Set to FALSE for no normalization
+                          normalize_score = c(NULL, "seeds", "group"), # Should scores be normalized? "seeds" to normalize the scores for each seed walk. "group" to normalize within grouping vars. Set to NULL for no normalization
                           walk_score = NULL, # minimal normalized walk score for results to keep. Can be applied to normalized or raw scores, see normalize_score. Will always apply to normalized score if available
                           keep_seed_terms = TRUE, # should seed terms always be kept, regardless of score? Only available if flatten_results = TRUE
                           progress = FALSE) # should the progress be shown for the map function?
@@ -17,6 +18,8 @@ get_rwr_terms <- function(walk_network, # an object made by make_multiplex_objec
   require(RandomWalkRestartMH)
   require(data.table)
   require(scales)
+  
+  match.arg(normalize_score, several.ok = FALSE) # check for correct argument specification here
   
   rwr_results <-
     seeds %>% purrr::map(\(seed_group)
@@ -46,32 +49,26 @@ get_rwr_terms <- function(walk_network, # an object made by make_multiplex_objec
                                                      dplyr::filter(Score > 0)
                                                  }
                                                  
-                                                 # if (normalize_score == "seeds"){ # normalization and score filtering on Seed Level (for each Random Walk)
-                                                 #   seed_walk <- seed_walk %>% 
-                                                 #     dplyr::mutate(ScoreNorm = scales::rescale(Score, to = c(0, 1)))
-                                                 #   if (!is.null(walk_score)) {
-                                                 #     seed_walk <- seed_walk %>% 
-                                                 #       dplyr::filter(ScoreNorm >= walk_score)
-                                                 #   }
-                                                 # } 
-                                                 
-                                                 # if (normalize_score == FALSE & !is.null(walk_score)) { # score filtering without normalization
-                                                 #   seed_walk <- seed_walk %>% 
-                                                 #     dplyr::filter(Score >= walk_score)
-                                                 # }
+                                                 if (normalize_score == "seeds"){ # normalization and score filtering on Seed Level (for each Random Walk)
+                                                   seed_walk <- seed_walk %>%
+                                                     dplyr::mutate(ScoreNorm = scales::rescale(Score, to = c(0, 1)))
+                                                 }
                                                  
                                                  return(seed_walk)
                              }) %>% 
                              purrr::compact() %>%  # ... and remove NULLs
-                             data.table::rbindlist()
+                             data.table::rbindlist(use.names = TRUE)
                            
                            group_results <- group_results %>% 
                              dplyr::mutate(seed_term = dplyr::case_when(# mark seed terms of the group/policy field
                                NodeNames %in% seed_node ~ TRUE, .default = FALSE))
                            
-                           if (normalize_score) { # normalization and score filtering on Group Level (within each group, e.g. policy field)
-                             group_results <- group_results %>% 
-                               dplyr::mutate(ScoreNorm = scales::rescale(Score, to = c(0, 1)))
+                           if (!is.null(normalize_score)) { 
+                             
+                             if (normalize_score == "group") { # normalization and score filtering on Group Level (within each group, e.g. policy field)
+                               group_results <- group_results %>% 
+                                 dplyr::mutate(ScoreNorm = scales::rescale(Score, to = c(0, 1)))
+                             }
                              
                              if (!is.null(walk_score) & keep_seed_terms == TRUE) {
                                group_results <- group_results %>% 
@@ -104,7 +101,7 @@ get_rwr_terms <- function(walk_network, # an object made by make_multiplex_objec
   
   if (flatten_results) { # flatten results into a single dataframe if desired
     rwr_results %>% 
-      rbindlist(idcol = "policy_field") %>% 
+      rbindlist(idcol = group_name, use.names = TRUE) %>% 
       return()
   } else {
     return(rwr_results)
