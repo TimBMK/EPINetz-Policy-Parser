@@ -11,7 +11,7 @@
   library(vroom)
 }
 
-init_tweets <- vroom(file = "Tokenizer/data_init_tweets_2023-05-31.csv.tar.gz",
+init_tweets <- vroom(file = "Tokenizer/data_init_tweets_2023-06-12.csv.tar.gz",
                      # Important! specify coltypes to preserve correct IDs
                      col_types = list(
                        `_id` = "c",
@@ -22,7 +22,7 @@ init_tweets <- vroom(file = "Tokenizer/data_init_tweets_2023-05-31.csv.tar.gz",
                        `_source.withheld.scope` = "c",
                        `_source.withheld.country_codes` = "c",
                        `_source.entities.cashtags` = "c"
-                     ))
+                     ), guess_max = 10000)
 
 
 # Tokenization, Lemmatization, Noun-Word Filtering
@@ -56,7 +56,7 @@ init_tokens <- init_tokens %>% left_join(init_tweets %>%
 # save
 init_tokens %>% 
   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
-  vroom_write(file = "Tokenizer/tokens_init_2023-05-31.csv.tar.gz", delim = ",")
+  vroom_write(file = "Tokenizer/tokens_init_2023-06-12.csv.tar.gz", delim = ",")
 
 
 

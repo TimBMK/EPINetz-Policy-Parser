@@ -40,7 +40,7 @@ committees <- read_csv("Seed_Accounts/committee_seeds_19-20_2023-04-06.csv", col
 
 get_replies <- TRUE
 
-date_range <- tibble(until = ymd("2023-05-31"), from = min(committees$begin)) # from beginning of first WP until 10th of April 2023
+date_range <- tibble(until = ymd("2023-06-12"), from = min(committees$begin)) # from beginning of first WP until 10th of April 2023
 
 account_list <- epinetz_list %>% 
   filter(!is.na(user_id)) %>% 

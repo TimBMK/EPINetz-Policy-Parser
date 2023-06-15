@@ -14,6 +14,9 @@
 
 source("/data/koenigt/Tools-Scripts/Tools & Scripts/elasticsearch_scrolledsearch.R") # scrolled search function
 
+date <- Sys.Date() # current date
+date_range <- date - years(1) # This is used for making an additional, smaller data set of only 1 year (required for the policy parser)
+
 # connect to Heidelberg Database via Tunnel. In Bash, use:
 # ssh -L 9201:erinome.ifi.uni-heidelberg.de:9200 USERNAME@adrastea.ifi.uni-heidelberg.de
 
@@ -37,28 +40,10 @@ epinetz_list <- readRDS("EPINetz_full_collection_list_update_11.RDS")
 # committees <- read_csv("Seed_Accounts/committee_seeds_19-20_2023-04-06.csv", col_types = list(user_id = "c")) # only necessary for min date
 
 
-# load existing tweets
+# load existing tokens
 
-files <- list.files("Tokenizer")
-
-if ("tokens.csv.tar.gz" %in% files) { # check for latest tokens file and load
-  
-  init_tokens <- vroom(file = "Tokenizer/tokens.csv.tar.gz",
-                       # Important! specify coltypes to preserve correct IDs
-                       col_types = list(
-                         doc_id = "c"
-                       ))
-  
-  
-} else { # else, fall back to initial tokenization
-  
-  init_tokens <- vroom(file = file.path("Tokenizer", files[str_detect(files, "tokens_init")]),
-                       # Important! specify coltypes to preserve correct IDs
-                       col_types = list(
-                         doc_id = "c"
-                       ))
-  
-}
+init_tokens <- get_latest_tokens_file(path = "Tokenizer") %>% 
+  vroom(col_types = list(doc_id = "c", `_source.author_id` = "c")) 
 
 
 #### API call ####
@@ -162,11 +147,16 @@ tokens <- tokens %>%
 
 
 # add to existing tokens & save
-rbindlist(list(init_tokens, tokens)) %>% # bind together
-  distinct(doc_id, sentence_id, token_id, token, .keep_all = TRUE) %>% # double-check duplicates
+updated_tokens <- rbindlist(list(init_tokens, tokens)) %>% # bind together
+  distinct(doc_id, sentence_id, token_id, token, .keep_all = TRUE) # double-check duplicates
+  
+updated_tokens %>% 
+  mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
+  vroom_write(file = "Tokenizer/tokens_full.csv.tar.gz", delim = ",")
+
+# smaller dataset of only 1 year for faster read-in
+updated_tokens %>% 
+  filter(`_source.created_at` >= date_range) %>% 
   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
   vroom_write(file = "Tokenizer/tokens.csv.tar.gz", delim = ",")
-
-
-
 
