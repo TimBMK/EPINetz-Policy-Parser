@@ -17,8 +17,6 @@
 
 source("get_seed_terms.R") # seed term extraction function
 
-source("utils_nested_data.R") # nested data utils
-
 source("utils_text_processing.R") # text processing utils
 
 source("get_rwr_terms.R") # random walk functions
@@ -32,8 +30,17 @@ chi2_committees <- 30 # set chi^2 threshold between committees
 # date <- Sys.Date()
 date <- ymd("2023-04-25") # testing
 
+# subdirectory to save results in
+dir <- "regular_classification/"
+
+# set filtering options for seed terms and walk terms
 seed_replies <- TRUE
+seed_mentions <- FALSE
+seed_urls <- TRUE
+
 walk_replies <- FALSE
+walk_mentions <- TRUE
+walk_urls <- TRUE
 
 save_seeds <- FALSE # should the Seed Terms be saved explicitly?
 
@@ -49,9 +56,8 @@ committees <- read_csv("Seed_Accounts/committee_seeds_19-20_2023-04-06.csv", col
 epinetz_accounts <- readRDS("EPINetz_full_collection_list_update_11.RDS") # list of all EPINetz Accounts
 
 # Get Tokenized Data
-tokens <- vroom("Tokenizer/tokens.csv.tar.gz", 
-                col_types = list(doc_id = "c",
-                                 `_source.author_id` = "c")) 
+tokens <- get_latest_tokens_file(path = "Tokenizer") %>% 
+  vroom(col_types = list(doc_id = "c", `_source.author_id` = "c")) 
 
 #### Extract Seed Terms ####
 
@@ -61,19 +67,13 @@ seed_NE <- tokens %>% as_tibble() %>%
            `_source.created_at` <= date) %>%  
   filter(`_source.author_id`  %in% ministries$user_id | # seed account tweets only
            `_source.author_id`  %in% committees$user_id ) %>% 
-  filter(is_reply == seed_replies | is_reply == FALSE) %>% # filter for reply condition (TRUE includes replies, FALSE does not)
-  filter(tag == "NE" | tag == "NN") %>% # Noun words and NEs only
-  filter(str_length(token) > 1) %>% # drop very short tokens, e.g. wrongly classified "#"
-  filter(!str_detect(lemma, "@")) %>%  # drop all lemmas containing "@" - that is, all mentions
-  # filter(!str_detect(lemma, "http")) %>%  # drop all URLs
-  filter(!(tolower(lemma) %in% stopwords(language = "en")) & # drop stopwords
-           !(tolower(lemma) %in% stopwords(language = "de")) &
-           !(tolower(lemma) %in% stopwords(language = "fr"))) %>% 
-  filter(lemma != "amp", lemma != "&amp", lemma != "RT", lemma != "rt", 
-         lemma != "--", lemma != "---") %>% # drop additional stopwords
-  mutate(lemma = case_when(!str_detect(lemma, "http") ~ tolower(lemma), # lower case - except for URLs (so they don't break)
-                           .default = lemma))
-
+  filter_tokens(tokens_col = "lemma", 
+                         tags = c("NN", "NE"), # Noun words and NEs only
+                         #minimum string length, stopwords dictionaries, additional stopwords and lower casing set to default
+                         replies = seed_replies, # filter for reply condition (TRUE includes replies, FALSE does not)  
+                         keep_mentions = seed_mentions, # should @-mentions be kept?
+                         keep_urls = seed_urls # should URLs be kept?
+)
   
 
 
@@ -142,16 +142,25 @@ seed_terms_committee_members <- committee_NE %>% # split datasets into committee
 if (save_seeds == TRUE) {
   seed_terms_ministries %>%
     mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
-    vroom_write(file = paste0("regular_classification/no_replies/seed_terms_ministries_", date ,".csv.tar.gz"), delim = ",")
+    vroom_write(file = paste0(dir, "seed_terms_ministries_", date ,".csv.tar.gz"), delim = ",")
   
   seed_terms_committees %>%
     mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
-    vroom_write(file = paste0("regular_classification/no_replies/seed_terms_committees_", date ,".csv.tar.gz"), delim = ",")
+    vroom_write(file = paste0(dir, "seed_terms_committees_", date ,".csv.tar.gz"), delim = ",")
   
   seed_terms_committee_members %>%
     mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
-    vroom_write(file = paste0("regular_classification/no_replies/seed_terms_committee_members_", date ,".csv.tar.gz"), delim = ",")
+    vroom_write(file = paste0(dir, "seed_terms_committee_members_", date ,".csv.tar.gz"), delim = ",")
 }
+
+
+# Housekeeping
+
+rm(tokens)
+rm(seed_NE)
+rm(ministry_NE)
+rm(committee_NE)
+gc()
 
 
 
@@ -161,18 +170,12 @@ if (save_seeds == TRUE) {
 walk_NE <- tokens %>% as_tibble() %>% 
   filter(`_source.created_at` >= (date - time_frame_walks) & # time frame filtering
            `_source.created_at` <= date) %>%  
-  filter(is_reply == walk_replies | is_reply == FALSE) %>% # filter for reply condition (TRUE includes replies, FALSE does not)
-  filter(tag == "NE" | tag == "NN") %>% # Noun words and NEs only
-  filter(str_length(token) > 1) %>% # drop very short tokens, e.g. wrongly classified "#"
-  # filter(!str_detect(lemma, "@")) %>%  # drop all lemmas containing "@" - that is, all mentions
-  filter(!(tolower(lemma) %in% stopwords(language = "en")) & # drop stopwords
-           !(tolower(lemma) %in% stopwords(language = "de")) &
-           !(tolower(lemma) %in% stopwords(language = "fr"))) %>% 
-  filter(lemma != "amp", lemma != "&amp", lemma != "RT", lemma != "rt", 
-         lemma != "--", lemma != "---") %>% # drop additional stopwords
-  mutate(lemma = case_when(!str_detect(lemma, "http") ~ tolower(lemma), # lower case - except for URLs (so they don't break)
-                           .default = lemma))
-
+  filter_tokens(tokens_col = "lemma", 
+                tags = c("NN", "NE"), # Noun words and NEs only
+                #minimum string length, stopwords dictionaries, additional stopwords and lower casing set to default
+                replies = walk_replies, # filter for reply condition (TRUE includes replies, FALSE does not)  
+                keep_mentions = walk_mentions, # should @-mentions be kept?
+                keep_urls = walk_urls) # should URLs be kept?
 
 
 ## drop 10% percentile of counts
@@ -213,9 +216,6 @@ seeds <- rbindlist(list(seed_terms_ministries, # bind seed terms of subsets toge
 # Housekeeping
 
 rm(tokens)
-rm(seed_NE)
-rm(ministry_NE)
-rm(committee_NE)
 rm(walk_NE)
 gc()
 
@@ -236,7 +236,7 @@ walk_terms <- get_rwr_terms(walk_network,
                             progress = FALSE) 
 
     
-## The terms returned include duplicates, esp. seed terms with keep_seed_terms = TRUE
+## The terms returned for 'normalize_score = "seeds"' include duplicates, esp. seed terms with keep_seed_terms = TRUE
 
 
 ## calculate means, re-normalize
@@ -255,7 +255,7 @@ walk_terms_means <- walk_terms %>%
 ## save
 walk_terms_means %>% 
   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
-  vroom_write(file = paste0("regular_classification/walk_terms_", 
-                            date, ".csv.tar.gz"), append = F)
+  vroom_write(file = paste0(dir, "walk_terms_", date, ".csv.tar.gz"), append = F)
   
 
+plan(sequential) # end multisession

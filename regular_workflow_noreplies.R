@@ -434,7 +434,7 @@ walk_terms_means %>%
 
 date_range <- tibble(until = date + days(7), from = date + days(1))
 
-epinetz_accounts <- readRDS("EPINetz_full_collection_list_update_10.RDs") # list of all EPINetz Accounts
+epinetz_accounts <- readRDS("EPINetz_full_collection_list_update_11.RDS") # list of all EPINetz Accounts
 
 account_list <- epinetz_accounts %>% # currently, this considers tweets of all accounts in the observation period, regardless of incumbency. This may change in the future
   filter(!is.na(user_id)) # drop entries without user IDs
@@ -467,7 +467,7 @@ classification_tweets %>%
   rowwise() %>% 
   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x)), # text as utf8
          across(.cols = where(is.list), ~ str_c(unlist(.x), collapse = ", "))) %>% # unlist nested lists
-  vroom_write("regular_classification/no_replies/classification_tweets.csv.tar.gz")
+  vroom_write(paste0("regular_classification/no_replies/classification_tweets_", date, ".csv.tar.gz"))
 
 
 # Tokenization, Lemmatization, Noun-Word Filtering

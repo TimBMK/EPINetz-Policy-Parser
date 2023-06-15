@@ -21,7 +21,13 @@ tweet_ids <- "..." # tweet IDs of tweets to be classified
 
 plan(multisession, workers = 4) # set up future multisession for future_map functions
 
+
 classification_replies <- FALSE # should replies get classified?
+
+classification_mentions <- TRUE # should mentions be utilized? adviced to keep this in line with walk_mentions
+
+classification_urls <- TRUE # should urls be utilized? adviced to keep this in line with walk_urls
+
 
 # Read lists
 ministries <- read_csv("Seed_Accounts/ministry_seeds_2023-04-06.csv", col_types = list(user_id = "c"))
@@ -109,14 +115,12 @@ spacy_finalize() # end spacy
 
 #### Classify Documents ####
 classification_NE <- classification_tokens %>% 
-  filter(tag == "NE" | tag == "NN") %>% # Noun words and NEs only
-  filter(str_length(lemma) > 1) %>% # drop very short tokens, e.g. wrongly classified "#"
-  filter(lemma != "amp", lemma != "&amp", lemma != "RT", lemma != "rt", lemma != "--", lemma != "---") %>% 
-  filter(!(tolower(lemma) %in% stopwords(language = "en")) & # drop stopwords
-           !(tolower(lemma) %in% stopwords(language = "de")) &
-           !(tolower(lemma) %in% stopwords(language = "fr"))) %>% 
-  mutate(lemma = case_when(!str_detect(lemma, "http") ~ tolower(lemma), # lower case - except for URLs (so they don't break)
-                           .default = lemma))
+  filter_tokens(tokens_col = "lemma", 
+                tags = c("NN", "NE"), # Noun words and NEs only
+                #minimum string length, stopwords dictionaries, additional stopwords and lower casing set to default
+                replies = NULL, # filtering for reply condition is done before tokenization to save on computing and can thus be skipped with NULL
+                keep_mentions = classification_mentions, # should @-mentions be kept?
+                keep_urls = classification_urls) # should URLs be kept?
 
 classification_terms <- classification_NE %>% 
   semi_join(walk_terms_means, # filter for lemmas in the walk terms 
