@@ -15,7 +15,8 @@
   library(scales)
 }
 
-options(future.globals.maxSize = (100000*1024^2)) # 10 gb Max Size for Parallelization Processes
+options(future.globals.maxSize = (100000*1024^2)) # 10 gb Max Size for Parallelization Processes. 
+                                                  #  This is necessary for making the dat_list in parallel and should be treated with care!
 
 # source("/data/koenigt/Tools-Scripts/Tools & Scripts/network_snapshots.R") # single snapshot function included in utils_networks.R
 
@@ -218,8 +219,7 @@ walk_networks_list %>%
        { network_name <- str_remove(walk_network, ".RDS") # reading in the data saved above
            
          readRDS(file.path("init_classification/no_replies/walk_network_data", walk_network)) %>% 
-           get_rwr_terms(walk_network,
-                         network_name = network_name,
+           get_rwr_terms(network_name = network_name,
                          seeds = seeds,
                          seed_var = "feature",
                          match_var = "period",

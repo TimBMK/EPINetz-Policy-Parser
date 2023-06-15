@@ -15,7 +15,7 @@
   library(scales)
 }
 
-options(future.globals.maxSize = (100000*1024^2)) # 10 gb Max Size for Parallelization Processes
+# options(future.globals.maxSize = (100000*1024^2)) # 10 gb Max Size for Parallelization Processes
 
 # source("/data/koenigt/Tools-Scripts/Tools & Scripts/network_snapshots.R") # single snapshot function included in utils_networks.R
 
@@ -35,6 +35,12 @@ walk_score = 0.5 # cutoff value for normalized random walk score
 
 keep_seed_terms = TRUE # should seed terms within the policy field of the same period always be kept, regardless of walk score?
 
+walk_replies = FALSE # should replies be considered for the random walks?
+
+walk_mentions = TRUE # should @-mentions be used for the random walks?
+
+walk_urls = TRUE # should URLs be used for the random walks?
+
 # read seed terms
 
 seed_terms_ministries <- vroom("init_classification/seed_terms_ministries.csv.tar.gz", 
@@ -50,41 +56,20 @@ seed_terms_committee_members <- vroom("init_classification/seed_terms_committee_
 
 # read data
 
-walk_tweets <-
-  vroom(
-    file = "init_classification/data_init_walk_2023-04-10.csv.tar.gz",
-    # Important! specify coltypes to preserve correct IDs
-    col_types = list(
-      `_id` = "c",
-      `_source.author_id` = "c",
-      `_source.conversation_id` = "c",
-      `_source.in_reply_to_user_id`= "c",
-      `_source.attachments.poll_ids` = "c",
-      `_source.withheld.scope` = "c",
-      `_source.withheld.country_codes` = "c",
-      `_source.entities.cashtags` = "c"
-    )
-  ) 
-
-
-walk_tokens <- vroom("init_classification/tokens_init_walk_2023-04-10.csv.tar.gz", col_types = list(doc_id = "c"))
+tokens <- get_latest_tokens_file(path = "Tokenizer") %>% 
+  vroom(col_types = list(doc_id = "c", `_source.author_id` = "c")) 
 
 
 ## NEs only
-walk_NE <- walk_tokens %>% as_tibble() %>% 
-  filter(tag == "NE" | tag == "NN") %>% # Noun words and NEs only
-  filter(str_length(lemma) > 1) %>% # drop very short tokens, e.g. wrongly classified "#"
-  filter(lemma != "amp", lemma != "&amp", lemma != "RT", lemma != "rt", lemma != "--", lemma != "---") %>% 
-  filter(!(tolower(lemma) %in% stopwords(language = "en")) & # drop stopwords
-           !(tolower(lemma) %in% stopwords(language = "de")) &
-           !(tolower(lemma) %in% stopwords(language = "fr"))) %>% 
-  filter(!str_detect(lemma, "@")) %>% # drop all lemmas containing "@" - that is, all mentions
-  filter(!str_detect(lemma, "http")) %>%  # drop all URLs
-  mutate(lemma = tolower(lemma)) %>%  # set case to lower to ignore casing in networks
-  left_join(walk_tweets %>% distinct(`_id`, `_source.created_at`), 
-            join_by(doc_id == `_id`)) %>%  # add time
-  mutate(week = ceiling_date(as_datetime(`_source.created_at`), # make week indicator (last day of the week)
-                             unit = "week"))
+walk_NE <- filter_tokens(tokens,
+                         tokens_col = "lemma", 
+                         tags = c("NN", "NE"), # Noun words and NEs only
+                         #minimum string length, stopwords dictionaries, additional stopwords and lower casing set to default
+                         replies = walk_replies, # filter for reply condition (TRUE includes replies, FALSE does not)  
+                         keep_mentions = walk_mentions, # should @-mentions be kept?
+                         keep_urls = walk_urls # should URLs be kept?
+                         )
+
 gc()
 
 # List of Timeframes
