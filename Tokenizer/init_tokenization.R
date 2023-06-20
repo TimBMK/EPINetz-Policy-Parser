@@ -11,6 +11,8 @@
   library(vroom)
 }
 
+cat("Reading Data...")
+
 init_tweets <- vroom(file = "Tokenizer/data_init_tweets_2023-06-12.csv.tar.gz",
                      # Important! specify coltypes to preserve correct IDs
                      col_types = list(
@@ -27,6 +29,8 @@ init_tweets <- vroom(file = "Tokenizer/data_init_tweets_2023-06-12.csv.tar.gz",
 
 # Tokenization, Lemmatization, Noun-Word Filtering
 
+cat("Preparing Data and Starting Spacy...")
+
 corpus <- corpus(init_tweets, docid_field = "_id", text_field = "_source.text", 
                       meta = list(names(init_tweets)), # preserve all vars as metadata
                       unique_docnames = T) # we could also use the conversation IDs to treat conversations as single documents
@@ -42,10 +46,15 @@ init_tokens <-
     entity = T
   )
 
+cat("Tokenization complete. Finalizing spacy...")
+
 spacy_finalize() # end spacy
 
 
 # add reply indicator, creation date and author account ID
+
+cat("Adding additional data...")
+
 init_tokens <- init_tokens %>% left_join(init_tweets %>% 
                                  distinct(`_id`, is_reply, 
                                           `_source.created_at`, 
@@ -54,9 +63,12 @@ init_tokens <- init_tokens %>% left_join(init_tweets %>%
 
 
 # save
+
+cat("Saving...")
+
 init_tokens %>% 
   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
   vroom_write(file = "Tokenizer/tokens_init_2023-06-12.csv.tar.gz", delim = ",")
 
 
-
+cat("Done.")

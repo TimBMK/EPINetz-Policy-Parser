@@ -17,6 +17,10 @@ source("/data/koenigt/Tools-Scripts/Tools & Scripts/elasticsearch_scrolledsearch
 date <- Sys.Date() # current date
 date_range <- date - years(1) # This is used for making an additional, smaller data set of only 1 year (required for the policy parser)
 
+verbose = TRUE
+
+save_tweets = FALSE
+
 # connect to Heidelberg Database via Tunnel. In Bash, use:
 # ssh -L 9201:erinome.ifi.uni-heidelberg.de:9200 USERNAME@adrastea.ifi.uni-heidelberg.de
 
@@ -30,8 +34,10 @@ conn <- connect(
   host = "localhost"
 )
 
-# conn$ping() # check connection
+if(verbose) conn$ping() # check connection
 
+
+if(verbose) cat("Reading Data...")
 
 # Read database
 
@@ -47,6 +53,8 @@ init_tokens <- get_latest_tokens_file(path = "Tokenizer") %>%
 
 
 #### API call ####
+
+if(verbose) cat("Making API Call...")
 
 get_replies <- TRUE
 
@@ -93,6 +101,8 @@ new_ids <- all_ids %>% anti_join(init_tokens %>% distinct(doc_id),
 
 # Get full tweets
 
+if(verbose) cat("Pulling Full Tweets...")
+
 new_tweets <- tibble() # data container
 
 for (i in seq(1, length(new_ids %>% distinct(`_id`) %>% pull()), 100)) { # the search query needs to be chopped up into smaller bits (100 IDs per chunk)
@@ -118,6 +128,8 @@ new_tweets <- new_tweets %>% mutate(is_reply = case_when(!is.na(`_source.in_repl
 
 #### Tokenize ####
 
+if(verbose) cat("Preparing Data and Starting Spacy...")
+
 corpus <- corpus(new_tweets, docid_field = "_id", text_field = "_source.text", 
                  meta = list(names(new_tweets)), # preserve all vars as metadata
                  unique_docnames = T) # we could also use the conversation IDs to treat conversations as single documents
@@ -133,10 +145,14 @@ tokens <-
     entity = T
   )
 
+if(verbose) cat("Tokenization complete. Finalizing spacy...")
+
 spacy_finalize() # end spacy
 
 
 # add reply indicator, creation date and author account ID
+if(verbose) cat("Adding additional data...")
+  
 tokens <- tokens %>%
   left_join(new_tweets %>% 
               distinct(`_id`, is_reply, 
@@ -146,6 +162,7 @@ tokens <- tokens %>%
   mutate(`_source.created_at` = as_datetime(`_source.created_at`))
 
 
+if(verbose) cat("Saving...")
 # add to existing tokens & save
 updated_tokens <- rbindlist(list(init_tokens, tokens)) %>% # bind together
   distinct(doc_id, sentence_id, token_id, token, .keep_all = TRUE) # double-check duplicates
@@ -160,3 +177,10 @@ updated_tokens %>%
   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
   vroom_write(file = "Tokenizer/tokens.csv.tar.gz", delim = ",")
 
+if(save_tweets) {
+  new_tweets %>% 
+    rowwise() %>% 
+    mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x)), # text as utf8
+           across(.cols = where(is.list), ~ str_c(unlist(.x), collapse = ", "))) %>%  # unlist lists (otherwise lost in export!)
+    vroom_write(paste0("Tokenizer/data_new_tweets_", date, ".csv.tar.gz"))
+}
