@@ -70,6 +70,9 @@ ministry_NE <- ministries %>%
 committee_NE <- committees %>% 
   inner_join(seed_NE, by = join_by(user_id == `_source.author_id`), # inner_join ensures we only keep accounts for which we have data
              relationship = "many-to-many") %>% 
+  dplyr::filter((as_date(`_source.created_at`) >= as_date(begin) & # filter for active committee time periods
+                   as_date(`_source.created_at`) <= as_date(end)) | 
+                  is.na(end)) %>%   
   select(user_id, official_name, policy_field, doc_id, lemma, committee)
 
 # Split Data into weekly one-year-frames (back to beginning of the set date range)

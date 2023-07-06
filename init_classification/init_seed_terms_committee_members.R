@@ -37,30 +37,35 @@ ministries <- read_csv("Seed_Accounts/ministry_seeds_2023-04-06.csv", col_types 
 committees <- read_csv("Seed_Accounts/committee_seeds_19-20_2023-04-06.csv", col_types = list(user_id = "c"))
 
 
-seed_tweets <-
-  vroom(
-    file = "init_classification/data_init_seeds_2023-04-10.csv.tar.gz",
-    # Important! specify coltypes to preserve correct IDs
-    col_types = list(
-      `_id` = "c",
-      `_source.author_id` = "c",
-      `_source.conversation_id` = "c",
-      `_source.in_reply_to_user_id`= "c",
-      `_source.attachments.poll_ids` = "c",
-      `_source.withheld.scope` = "c",
-      `_source.withheld.country_codes` = "c",
-      `_source.entities.cashtags` = "c"
-    )
-  ) 
+# seed_tweets <-
+#   vroom(
+#     file = "init_classification/data_init_seeds_2023-04-10.csv.tar.gz",
+#     # Important! specify coltypes to preserve correct IDs
+#     col_types = list(
+#       `_id` = "c",
+#       `_source.author_id` = "c",
+#       `_source.conversation_id` = "c",
+#       `_source.in_reply_to_user_id`= "c",
+#       `_source.attachments.poll_ids` = "c",
+#       `_source.withheld.scope` = "c",
+#       `_source.withheld.country_codes` = "c",
+#       `_source.entities.cashtags` = "c"
+#     )
+#   ) 
 
 
-seed_tokens <- vroom("init_classification/tokens_init_seeds_2023-04-10.csv.tar.gz", col_types = list(doc_id = "c"))
-
-
-seed_NE <- seed_tokens %>% as_tibble() %>% 
-  filter(tag == "NE" | tag == "NN") %>% # Noun words and NEs only
-  filter(str_length(token) > 1) %>% # drop very short tokens, e.g. wrongly classified "#"
-  filter(token != "amp", token != "&amp")
+seed_NE <- get_latest_tokens_file(path = "Tokenizer") %>% 
+  vroom(col_types = list(doc_id = "c", `_source.author_id` = "c"))  %>% 
+  as_tibble() %>% 
+  filter(`_source.author_id`  %in% ministries$user_id | # seed account tweets only
+           `_source.author_id`  %in% committees$user_id ) %>% 
+  filter_tokens(tokens_col = "lemma", 
+                tags = c("NN", "NE"), # Noun words and NEs only
+                #minimum string length, stopwords dictionaries, additional stopwords and lower casing set to default
+                replies = seed_replies, # filter for reply condition (TRUE includes replies, FALSE does not)  
+                keep_mentions = seed_mentions, # should @-mentions be kept?
+                keep_urls = seed_urls # should URLs be kept?
+  )
 
 
 # Data Structuring & Cleaning
@@ -72,7 +77,9 @@ committee_tweets <- committees %>% left_join(seed_tweets,
 committee_NE <- committee_tweets %>% 
   left_join(seed_NE, by = join_by(`_id` == doc_id), 
             relationship = "many-to-many") %>% 
-  select(user_id, official_name, policy_field, committee, `_id`, lemma) %>% 
+  dplyr::filter((as_date(`_source.created_at`) >= as_date(begin) & # filter for active committee time periods
+                   as_date(`_source.created_at`) <= as_date(end)) | 
+                  is.na(end)) %>%   select(user_id, official_name, policy_field, committee, `_id`, lemma) %>% 
   filter(!str_detect(lemma, "@")) # drop all lemmas containing "@" - that is, all mentions
 
 
