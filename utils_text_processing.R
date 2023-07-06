@@ -28,8 +28,8 @@ drop_quantile <- function(data,   # data
   
   # save min and max counts for verbose output
   if (verbose == TRUE) {
-    range <- tibble(min = min(res$entity_count),
-                    max = max(res$entity_count))
+    range <- dplyr::tibble(min = min(res$entity_count),
+                           max = max(res$entity_count))
   }
   
   # calculate quantile for filtering
@@ -72,7 +72,8 @@ drop_quantile <- function(data,   # data
   }
   
   if (ignore_case == TRUE) {
-    res <- res %>% mutate({{tokens}} := orig_tokens) %>% select(!orig_tokens) # restore original tokens
+    res <- res %>% dplyr::mutate({{tokens}} := orig_tokens) %>% # restore original tokens
+      dplyr::select(!orig_tokens) 
   }
   
   return(res)
@@ -95,6 +96,8 @@ filter_tokens <- function(tokens,
   
   require(dplyr)
   require(stopwords)
+  require(stringr)
+  require(purrr)
   
   # some checks
   
@@ -120,53 +123,54 @@ filter_tokens <- function(tokens,
   
   if (!is.null(tags)) {
     tokens <- tokens %>% 
-      filter(tag %in% tags)
+      dplyr::filter(tag %in% tags)
   }
   
   tokens <- tokens %>% 
-    filter(str_length(!!as.name(tokens_col)) >= min_str_length) 
+    dplyr::filter(stringr::str_length(!!as.name(tokens_col)) >= min_str_length) 
     
   if (tolower) {
     tokens <- tokens %>%
-      mutate(lemma = # lower case - 
-               case_when(str_detect(!!as.name(tokens_col), "http") # except for URLs (so they don't break) ...
-                         ~ !!as.name(tokens_col), 
-                         !!as.name(tokens_col) == toupper(!!as.name(tokens_col)) # ... and acronyms (all caps), e.g. "UN", "IT" etc
-                         ~ !!as.name(tokens_col),
-                 .default = tolower(!!as.name(tokens_col))))
+      dplyr::mutate(lemma = # lower case - 
+                      dplyr::case_when(
+                        str_detect(!!as.name(tokens_col), "http") # except for URLs (so they don't break) ...
+                        ~ !!as.name(tokens_col), 
+                        !!as.name(tokens_col) == toupper(!!as.name(tokens_col)) # ... and acronyms (all caps), e.g. "UN", "IT" etc
+                        ~ !!as.name(tokens_col),
+                        .default = tolower(!!as.name(tokens_col))))
   }
   
   if (!is.null(stopword_languages)) {
     
     stopwords <- stopword_languages %>% # combine stopwords dicts
-      map(\(lang) stopwords::stopwords(language = lang, 
+      purrr::map(\(lang) stopwords::stopwords(language = lang, 
                                        source = stopword_dictionary)) %>% 
       unlist()
     
     tokens <- tokens %>% 
-      filter(!(!!as.name(tokens_col) %in% stopwords))
+      dplyr::filter(!(!!as.name(tokens_col) %in% stopwords))
   }
   
   if (!is.null(additional_stopwords)) {
     tokens <- tokens %>% 
-      filter(!(!!as.name(tokens_col) %in% additional_stopwords))
+      dplyr::filter(!(!!as.name(tokens_col) %in% additional_stopwords))
   }
   
 
   
   if (!is.null(replies)) {
     tokens <- tokens %>%
-    filter(is_reply == replies | is_reply == FALSE) # filter for reply condition (TRUE includes replies, FALSE does not)
+    dplyr::filter(is_reply == replies | is_reply == FALSE) # filter for reply condition (TRUE includes replies, FALSE does not)
   }
   
   if (keep_mentions == FALSE) {
     tokens <- tokens %>%
-      filter(!str_detect(!!as.name(tokens_col), "@")) # drop all lemmas containing "@" - that is, all mentions
+      dplyr::filter(!stringr::str_detect(!!as.name(tokens_col), "@")) # drop all lemmas containing "@" - that is, all mentions
   }
 
   if (keep_urls == FALSE) {
     tokens <- tokens %>%
-      filter(!str_detect(!!as.name(tokens_col), "http"))  # drop all URLs
+      dplyr::filter(!stringr::str_detect(!!as.name(tokens_col), "http"))  # drop all URLs
   }
   
   return(tokens)
@@ -177,6 +181,8 @@ get_latest_tokens_file <- function(path,
                                    pattern ="tokens.csv.tar.gz", # regular updates of the tokens file will always be named "tokens.csv.tar.gz"
                                    fallback = "tokens_init") {  # fallback pattern to look for, with only the latest returned 
                                                                 #  if there are multiple matches according to the pattern "tokens_init_[date]"
+  require(stringr)
+  require(dplyr)
   
   files <- list.files(path)
   
@@ -186,7 +192,9 @@ get_latest_tokens_file <- function(path,
     
   } else { # else, fall back to initial tokenization
     
-    latest_tokens <- file.path("Tokenizer", files[str_detect(files, fallback)])
+    latest_tokens <- tibble(files = files) %>% 
+      dplyr::filter(stringr::str_detect(files, fallback)) %>% 
+      dplyr::arrange(dplyr::desc(files)) %>% dplyr::slice_head(n = 1)
                          
   }
   
