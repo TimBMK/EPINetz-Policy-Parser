@@ -13,6 +13,7 @@
 }
 
 source("/data/koenigt/Tools-Scripts/Tools & Scripts/elasticsearch_scrolledsearch.R") # scrolled search function
+source("utils_text_processing.R")
 
 date <- Sys.Date() # current date
 date_range <- date - years(1) # This is used for making an additional, smaller data set of only 1 year (required for the policy parser)
