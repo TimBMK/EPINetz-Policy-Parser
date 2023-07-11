@@ -12,15 +12,19 @@
   library(vroom)
 }
 
-options(future.globals.maxSize = (100000*1024^2)) # 10 gb Max Size for Parallelization Processes
+# options(future.globals.maxSize = (100000*1024^2)) # 10 gb Max Size for Parallelization Processes
 
 source("get_seed_terms.R")
 
 source("utils_text_processing.R")
 
-# plan(multisession, workers = 4) # start multisession (for mapping processes) - Multisession for R Studio Sessions
-plan(multicore, workers = 4) # start multisession (for mapping processes) - ! DO NOT USE MULTICORE IN RSTUDIO SESSION. ONLY WHEN CALLING THE SCRIPT DIRECTLY !
-                              # !!multicore plans can be unstable!!
+if (installr::is.RStudio()){ # Multisession for R Studio Sessions
+  plan(multisession, workers = 16) 
+} else { # multicore for scripts / non-rstudio processes
+  plan(multicore, workers = 16)
+  
+}
+
 
 
 # set filtering options for seed terms
@@ -30,10 +34,25 @@ seed_urls <- TRUE
 
 time_frame_seeds <- years(1) # length of the time frame for seed term extraction
 
-# set Chi^2 values
-chi2_ministries <- 500 # set chi^2 threshold for ministries
+
+# set Chi^2 values etc
+
+chi2_ministries <- 150 # set chi^2 threshold for ministries
+max_results_ministries <- 230 # number of maximum results for each ministry (NULL to skip). chi2 threshold remains active!
+min_results_ministries <-  100 # number of minimum results for each ministry
+
 chi2_committee_members <- 250 # set chi^2 threshold for within-committee members
-chi2_committees <- 30 # set chi^2 threshold between committees
+max_results_committee_members <-  NULL # number of maximum results for each committee member (NULL to skip). chi2 threshold remains active!
+min_results_committee_members <-  NULL # number of minimum results for each committee member (NULL to skip)
+
+chi2_committees <- 40 # set chi^2 threshold between committees
+max_results_committees <-  200 # number of maximum results for each committee (NULL to skip). chi2 threshold remains active!
+min_results_committees <-  35 # number of minimum results for each committee (NULL to skip)
+
+
+max_result_ties <-  TRUE # should ties for max results be kept? If TRUE, may return more than the requested number of seed terms
+
+active_committees_only <- TRUE # should only committee tweets sent during their active period be used in the seed term generation?
 
 
 cat("\n preparations \n\n")
@@ -79,7 +98,7 @@ committee_NE <- committees %>%
 
   # min <- date_range$from + time_frame_seeds # do not go back behind the first LP (for committees) -- only necessary for data ranging beyond the LP (then, only ministry data could be used)
 
-dat_list <- future_map(ceiling_date(as_datetime(seed_NE$`_source.created_at`), 
+dat_list <- map(ceiling_date(as_datetime(seed_NE$`_source.created_at`), 
                                     unit = "week") %>% unique(),
                        ~ {
                          # ministry_tweets %>% mutate(type = "ministry") %>%                # ministry + committee tweets combined ... ! only necessary for min date filtering
@@ -107,49 +126,23 @@ names(dat_list) <- ceiling_date(as_datetime(seed_NE$`_source.created_at`),
 ## Ministries
 
 cat("\n Ministries \n\n") # keep track of the script in out file
-# seed_terms_ministries <- dat_list %>% 
-#   future_map( 
-#     . %>% 
-#       inner_join(ministry_NE, by = "_id") %>% # add NEs
-#       get_seed_terms(doc_id = "_id",          # calculate Seed Terms
-#                      tokens = "lemma",
-#                      grouping_var = "official_name",
-#                      policy_field = "policy_field",
-#                      threshold = chi2_ministries,
-#                      show_plots = F,
-#                      save_plots = T),
-#     .options = furrr_options(seed = seed), # set seed to prevent RNG issues
-#     .progress = T
-#     )
-# 
-# cat("\n Calculations finished. Saving...")
-# 
-# save_nested_tarball(seed_terms_ministries,
-#                     index = 1,
-#                     file_name = "init_classification/ministry_seeds.gz")
-# 
-# save_nested_plots_tarball(seed_terms_ministries,
-#                           index = 2,
-#                           file_name = "init_classification/ministry_seed_plots.gz",
-#                           progress = T)
-
-
-# saveRDS(seed_terms_ministries, file = "init_classification/init_seed_terms_ministries.RDS")
 
 dat_list %>% 
   future_iwalk(\(x, idx)
                {
                  dat <- x %>%
                    inner_join(ministry_NE, by = "_id") %>% # add NEs
-                   get_seed_terms(
-                     doc_id = "_id",
-                     tokens = "lemma",
-                     grouping_var = "official_name",
-                     policy_field = "policy_field",
-                     threshold = chi2_ministries,
-                     show_plots = F,
-                     save_plots = T
-                   )
+                   get_seed_terms(data = ministry_NE,
+                                  doc_id = "doc_id",
+                                  tokens = "lemma",
+                                  grouping_var = "official_name",
+                                  policy_field = "policy_field",
+                                  threshold = chi2_ministries,
+                                  max_results =  max_results_ministries,
+                                  max_result_ties = max_result_ties,
+                                  min_results = min_results_ministries,
+                                  show_plots = F,
+                                  save_plots = T)
                  
                  dat %>% .[[1]] %>% mutate(period = idx) %>%
                    mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
@@ -183,15 +176,17 @@ dat_list %>%
                {
                  dat <- x %>%
                    inner_join(committee_NE, by = "_id") %>% # add NEs
-                   get_seed_terms(
-                     doc_id = "_id",
-                     tokens = "lemma",
-                     grouping_var = "committee",
-                     policy_field = "policy_field",
-                     threshold = chi2_committees,
-                     show_plots = F,
-                     save_plots = T
-                   )
+                   get_seed_terms(data = committee_NE,
+                                  doc_id = "doc_id",
+                                  tokens = "lemma",
+                                  grouping_var = "committee",
+                                  policy_field = "policy_field",
+                                  threshold = chi2_committees,
+                                  max_results =  max_results_committees,
+                                  max_result_ties = max_result_ties,
+                                  min_results = min_results_committees,
+                                  show_plots = F,
+                                  save_plots = T)
                  
                  dat %>% .[[1]] %>% mutate(period = idx) %>%
                    mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
@@ -229,11 +224,14 @@ at_list %>%
                    inner_join(committee_NE, by = "_id") %>% # add NEs
                    split(.$committee) %>% 
                    map(\(data) get_seed_terms(data = data,
-                                              doc_id = "_id",
+                                              doc_id = "doc_id",
                                               tokens = "lemma",
                                               grouping_var = "official_name",
                                               policy_field = "policy_field",
                                               threshold = chi2_committee_members,
+                                              max_results =  max_results_committee_members,
+                                              max_result_ties = max_result_ties,
+                                              min_results = min_results_committee_members,
                                               show_plots = F,
                                               save_plots = T)) 
                  dat %>% iwalk(\(y, idy)
