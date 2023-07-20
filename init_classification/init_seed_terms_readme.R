@@ -60,7 +60,7 @@ init_seed_terms_committee_members_diff <- init_seed_terms_committee_members %>%
 
 source("get_seed_terms.R")
 
-chi2_ministries <- 500 # set chi^2 threshold for ministries
+chi2_ministries <- 50 # set chi^2 threshold for ministries
 chi2_committee_members <- 250 # set chi^2 threshold for within-committee members
 chi2_committees <- 30 # set chi^2 threshold between committees
 
@@ -130,8 +130,8 @@ seed_NE_noreplies <- seed_tokens_noreplies %>% as_tibble() %>%
 
 # ! if you want to calculate seed terms for a specific time frame, e.g. one year,, subset here ! 
 
-time_frame <- tibble(until = ymd("2023-03-01"),
-                     from = until - years(1))
+time_frame <- tibble(until = lubridate::ymd("2019-07-07"),
+                     from = until - lubridate::years(1))
 
 tweets_subset <- seed_tweets %>% filter(`_source.created_at` <= time_frame$until & 
                                           `_source.created_at` >= time_frame$from)
