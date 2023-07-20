@@ -92,7 +92,7 @@ get_seed_terms <- function(data,              # dataframe containing tokens, gro
             dplyr::filter(!!as.name(measure) >= threshold) %>% nrow()
         }
         
-        if (!is.null(min_results) & number_results < min_results) {
+        if (!is.null(min_results) && number_results < min_results) {
           textstat_res <- textstat_res %>% 
             dplyr::slice_max(!!as.name(measure), 
                              n = min_results,
