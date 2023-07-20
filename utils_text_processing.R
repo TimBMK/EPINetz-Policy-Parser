@@ -192,7 +192,7 @@ get_latest_tokens_file <- function(path,
     
   } else { # else, fall back to initial tokenization
     
-    latest_tokens <- tibble(files = files) %>% 
+    latest_tokens <- dplyr::tibble(files = files) %>% 
       dplyr::filter(stringr::str_detect(files, fallback)) %>% 
       dplyr::arrange(dplyr::desc(files)) %>% dplyr::slice_head(n = 1)
                          
@@ -203,3 +203,30 @@ get_latest_tokens_file <- function(path,
 }
 
 
+read_timelimited_data <- function(file,
+                                  ..., # arguments to pass to vroom()
+                                  filter_var = "_source.created_at", # filtering var as datetime 
+                                  starting_point, # the starting point, as "YYYY-MM-DD"
+                                  timeframe = lubridate::weeks(1), # the timeframe before or after the starting point, as a lubridate period
+                                  before_after = c("before", "after")) {
+  require(rlang)
+  require(dplyr)
+  require(lubridate)
+  require(vroom)
+  
+  rlang::arg_match(before_after)
+  
+  if (before_after == "before") {
+    data <- vroom::vroom(file, ...) %>%
+      dplyr::filter(!!as.name(filter_var) <= lubridate::ymd(starting_point) &
+                      !!as.name(filter_var) >= (lubridate::ymd(starting_point) - timeframe))}
+  
+  if (before_after == "after") {
+    data <- vroom::vroom(file, ...) %>% 
+      dplyr::filter(!!as.name(filter_var) >= lubridate::ymd(starting_point) &
+                      !!as.name(filter_var) <= (lubridate::ymd(starting_point) + timeframe))}
+  
+  gc(verbose = FALSE)
+  
+  return(data)
+}
