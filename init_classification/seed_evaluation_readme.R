@@ -11,6 +11,9 @@
 
 # run this part once 
 {
+  library(lubridate)
+  library(purrr)
+  library(dplyr)
   library(tidyverse)
   library(data.table)
   library(vroom)
@@ -27,25 +30,21 @@ source("workflow_seed_terms.R") # full seed terms worfklow
 plan(multisession, workers = 8) # set up future multisession for future_map functions
 options(future.globals.maxSize = (50000*1024^2)) # 5 gb Max Size for Parallelization Processes
 
-chi2_ministries <- 150 # set chi^2 threshold for ministries
-max_results_ministries <- 230 # number of maximum results for each ministry (NULL to skip). chi2 threshold remains active!
-min_results_ministries <-  100 # number of minimum results for each ministry
+chi2_ministries <- 50 # set chi^2 threshold for ministries
+max_results_ministries <- NULL # number of maximum results for each ministry (NULL to skip). chi2 threshold remains active!
 
 chi2_committee_members <- 250 # set chi^2 threshold for within-committee members
 max_results_committee_members <-  NULL # number of maximum results for each committee member (NULL to skip). chi2 threshold remains active!
-min_results_committee_members <-  NULL # number of minimum results for each committee member (NULL to skip)
 
-chi2_committees <- 40 # set chi^2 threshold between committees
-max_results_committees <-  200 # number of maximum results for each committee (NULL to skip). chi2 threshold remains active!
-min_results_committees <-  35 # number of minimum results for each committee (NULL to skip)
+chi2_committees <- 30 # set chi^2 threshold between committees
+max_results_committees <-  NULL # number of maximum results for each committee (NULL to skip). chi2 threshold remains active!
 
-
-max_result_ties <-  TRUE # should ties for max results be kept? If TRUE, may return more than the requested number of seed terms
+max_result_ties <-  FALSE # should ties for max results be kept? If TRUE, may return more than the requested number of seed terms
 
 active_committees_only <- TRUE # should only committee tweets sent during their active period be used in the seed term generation?
 
-date <- ymd("2023-04-25") # set date of the time frame you wish to calculate seeds for (max date)
-time_frame_seeds <- years(1) # length of the time frame for seed term extraction (date - time_frame)
+date <- lubridate::ymd("2021-03-23") # set date of the time frame you wish to calculate seeds for (max date)
+time_frame_seeds <- lubridate::years(1) # length of the time frame for seed term extraction (date - time_frame)
 
 # set filtering options for seed terms and walk terms --- this may be slightly different than in the initial evaluation
 seed_replies <- TRUE
@@ -84,13 +83,10 @@ seed_terms <- seed_terms_workflow(    # high-level function for the whole seed t
   seed_urls = seed_urls, # should URLs be utilized?
   chi2_ministries = chi2_ministries, # set chi^2 threshold for ministries
   max_results_ministries = max_results_ministries,
-  min_results_ministries = min_results_ministries,
   chi2_committee_members = chi2_committee_members, # set chi^2 threshold for within-committee members
   max_results_committee_members = max_results_committee_members,
-  min_results_committee_members = min_results_committee_members,
   chi2_committees = chi2_committees, # set chi^2 threshold between committees
   max_results_committees = max_results_committees,
-  min_results_committees = min_results_committees,
   max_result_ties = max_result_ties,
   active_committees_only = active_committees_only,
   save_seeds = save_seeds, # should the Seed Terms be saved explicitly in 'dir'? If TRUE, saves data for ministries, committees, and committee members seperately)
