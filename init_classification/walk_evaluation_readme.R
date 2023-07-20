@@ -302,4 +302,49 @@ seeds <- rbindlist(list(seed_terms_ministries, # bind seed terms of subsets toge
 
 
 
+### Troubleshooting ####################
+
+# Make sure your packages are up to date!
+# You can check your current environment and package versions with sessionInfo()
+#
+# Restart R (click "Session - Restart R" in the top bar), install and reload the updated packages via the library() commands in the script
+#
+# The Code was tested with the following packages and environment:
+#   
+#   R version 4.2.2 Patched (2022-11-10 r83330)
+# Platform: x86_64-pc-linux-gnu (64-bit)
+# Running under: Ubuntu 20.04.5 LTS
+# 
+# Matrix products: default
+# BLAS:   /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.9.0
+# LAPACK: /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.9.0
+# 
+# locale:
+# [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C               LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    
+# [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8    LC_PAPER=en_US.UTF-8       LC_NAME=C                 
+# [9] LC_ADDRESS=C               LC_TELEPHONE=C             LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       
+# 
+# attached base packages:
+# [1] stats     graphics  grDevices utils     datasets  methods   base     
+# 
+# other attached packages:
+# [1] rlang_1.1.1                stopwords_2.3              patchwork_1.1.1            scales_1.2.1              
+# [5] RandomWalkRestartMH_1.13.1 igraph_1.4.1               vroom_1.6.1                furrr_0.3.1               
+# [9] future_1.27.0              data.table_1.14.2          quanteda.textstats_0.95    quanteda_3.2.1            
+# [13] lubridate_1.9.2            forcats_1.0.0              stringr_1.5.0              dplyr_1.1.1               
+# [17] purrr_1.0.1                readr_2.1.4                tidyr_1.3.0                tibble_3.2.1              
+# [21] ggplot2_3.4.2              tidyverse_2.0.0           
+# 
+# loaded via a namespace (and not attached):
+# [1] Rcpp_1.0.10         ape_5.7-1           lattice_0.20-45     listenv_0.8.0       digest_0.6.31       utf8_1.2.3         
+# [7] parallelly_1.32.1   R6_2.5.1            stats4_4.2.2        dnet_1.1.7          nsyllable_1.0.1     pillar_1.9.0       
+# [13] rstudioapi_0.14     Rgraphviz_2.42.0    hexbin_1.28.3       Matrix_1.5-1        labeling_0.4.2      bit_4.0.5          
+# [19] munsell_0.5.0       compiler_4.2.2      BiocGenerics_0.44.0 pkgconfig_2.0.3     globals_0.16.0      tidyselect_1.2.0   
+# [25] codetools_0.2-19    supraHex_1.36.0     fansi_1.0.4         crayon_1.5.2        tzdb_0.3.0          withr_2.5.0        
+# [31] MASS_7.3-58.2       grid_4.2.2          nlme_3.1-162        gtable_0.3.1        lifecycle_1.0.3     magrittr_2.0.3     
+# [37] RcppParallel_5.1.5  graph_1.76.0        cli_3.6.1           stringi_1.7.12      farver_2.1.1        generics_0.1.3     
+# [43] vctrs_0.6.2         fastmatch_1.1-3     tools_4.2.2         bit64_4.0.5         glue_1.6.2          hms_1.1.3          
+# [49] parallel_4.2.2      timechange_0.1.1    colorspace_2.0-3   
+
+
 
