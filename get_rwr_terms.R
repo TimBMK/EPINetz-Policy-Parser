@@ -219,13 +219,24 @@ get_rwr_terms <- function(walk_network, # an object made by make_multiplex_objec
                              
                              if (!is.null(walk_score) & walk_score_quantile) {
                                
+                               quantile_value <- group_results %>% 
+                                 pull(!!as.name(filter_var)) %>% 
+                                 stats::quantile(walk_score) %>% 
+                                 .[[1]]
+                               
+                               cat(paste0("Quantile-based threshold for ",
+                                          group_name, " ", 
+                                          name, " in ",
+                                          filter_var, ": ",
+                                          quantile_value, "\n"))
+                               
                                if (keep_seed_terms) {
                                  group_results <- group_results %>% 
-                                   dplyr::filter(!!as.name(filter_var) >= stats::quantile(!!as.name(filter_var), walk_score) |
+                                   dplyr::filter(!!as.name(filter_var) >= quantile_value |
                                                    seed_term == TRUE)
                                } else {
                                  group_results <- group_results %>% 
-                                   dplyr::filter(!!as.name(filter_var) >= stats::quantile(!!as.name(filter_var), walk_score))
+                                   dplyr::filter(!!as.name(filter_var) >= quantile_value)
                                }
                                
                              }
