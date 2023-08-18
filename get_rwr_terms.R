@@ -220,7 +220,7 @@ get_rwr_terms <- function(walk_network, # an object made by make_multiplex_objec
                              if (!is.null(walk_score) & walk_score_quantile) {
                                
                                quantile_value <- group_results %>% 
-                                 pull(!!as.name(filter_var)) %>% 
+                                 dplyr::pull(!!as.name(filter_var)) %>% 
                                  stats::quantile(walk_score) %>% 
                                  .[[1]]
                                
