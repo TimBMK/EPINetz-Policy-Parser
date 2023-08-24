@@ -224,7 +224,9 @@ get_rwr_terms <- function(walk_network, # an object made by make_multiplex_objec
                                  stats::quantile(walk_score) %>% 
                                  .[[1]]
                                
-                               cat(paste0("Quantile-based threshold for ",
+                               cat(paste0("Quantile-based threshold (",
+                                          walk_score, " quantile)",
+                                          " for ",
                                           group_name, " ", 
                                           name, " in ",
                                           filter_var, ": ",
