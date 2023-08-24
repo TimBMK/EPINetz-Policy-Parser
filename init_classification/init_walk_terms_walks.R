@@ -33,18 +33,18 @@ if (installr::is.RStudio()){
 
 # settings
 
-walk_score_normalization = c("seeds","group") # Should scores be normalized? "seeds" to normalize the scores for each seed walk. "group" to normalize within grouping vars. Set to NULL for no normalization. 
+walk_score_normalization = "seeds" # Should scores be normalized? "seeds" to normalize the scores for each seed walk. "group" to normalize within grouping vars. Set to NULL for no normalization. 
 
 calculate_means = TRUE # should the means of the score be calculated and displayed? The can also be used for minimum walk_score filtering (see below)
 
 positive_scores_only = TRUE # should negative Walk Scores (i.e. very unlikely connection due to negative weights) and 0 scores be dropped? Applied before normalization
 
-walk_score = 0.5 # cutoff value for normalized random walk score. Non-Null Values require the selection of a measure to filter on if more than one walk_score_normalization method is picked
+walk_score = 0.9 # cutoff value for normalized random walk score. Non-Null Values require the selection of a measure to filter on if more than one walk_score_normalization method is picked
 
-walk_score_measure = "seeds" # value to apply the walk_score filter on. 
+walk_score_measure = "seeds_mean" # value to apply the walk_score filter on. 
 # Possible are: "default" (auto-pick), "raw" (non-normalized rwr score), "seeds" (seed normalized), "seeds_mean" (mean of seed normalized), "group" (group normalized), "group_mean" (mean of group normalized). Needs to be specified if more than one 
 
-walk_score_quantile = FALSE # Should the quantile be calculated as a dynamic minimum walk_score for each group? If TRUE, walk_score specifies the quantile, rather than a fixed value. Cutoff values may differ from group to group
+walk_score_quantile = TRUE # Should the quantile be calculated as a dynamic minimum walk_score for each group? If TRUE, walk_score specifies the quantile, rather than a fixed value. Cutoff values may differ from group to group
 
 report_quantiles = TRUE # should the quantiles of the selected walk_score_measure for each group be printed out? This is independent of walk_score_quantiles and calculated before walk_score filtering
 
@@ -56,11 +56,15 @@ seedterm_value = NULL # should the actual value of seed terms be overwritten by 
 
 # read seed terms
 
-seed_terms_ministries <- vroom("init_classification/seed_terms_ministries.csv.tar.gz")
+seed_terms_ministries <- vroom("init_classification/seed_terms_ministries.csv.tar.gz") %>% 
+  mutate(policy_field = case_when(policy_field == "finanzen_haushalt" ~ "haushalt_finanzen", # rename for consistency with committee policy fields
+                                  .default = policy_field))
 
-seed_terms_committees <- vroom("init_classification/seed_terms_committees.csv.tar.gz") 
+seed_terms_committees <- vroom("init_classification/seed_terms_committees.csv.tar.gz") %>% 
+  filter(!is.na(policy_field)) # drop committees without an associated policy field, that is "Recht und Verbraucherschutz"
 
-seed_terms_committee_members <- vroom("init_classification/seed_terms_committee_members.csv.tar.gz") 
+seed_terms_committee_members <- vroom("init_classification/seed_terms_committee_members.csv.tar.gz") %>% 
+  filter(!is.na(policy_field)) # drop committees without an associated policy field, that is "Recht und Verbraucherschutz"
 
 
 # Make Seedlist
