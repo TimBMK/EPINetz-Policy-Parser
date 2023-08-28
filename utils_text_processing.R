@@ -230,3 +230,29 @@ read_timelimited_data <- function(file,
   
   return(data)
 }
+
+
+split_timeframes <- function(data, # the dataframe to read in
+                             datetime_var, # the name of the datetime var to use for splitting
+                             timeframe = lubridate::weeks(1), # the timeframe. can be any lubridate period
+                             before_after = c("before", "after") # split before or after the timeframe's endpoint
+                             ){
+  
+  rlang::arg_match(before_after)
+  
+    if (before_after == "before") {
+      out <- data %>% 
+        dplyr::mutate(period = lubridate::ceiling_date(!!as.name(datetime_var), unit = timeframe)) # end of the week
+    }
+    
+    if (before_after == "after") {
+      out <- data %>% 
+        dplyr::mutate(period = lubridate::floor_date(!!as.name(datetime_var), unit = timeframe)) # beginning of the week
+    }
+    
+    out <- out %>% 
+      data.table::as.data.table() %>% 
+      split(by = "period")
+    
+    return(out)
+}
