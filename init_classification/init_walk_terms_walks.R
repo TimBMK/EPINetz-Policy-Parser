@@ -103,7 +103,7 @@ walk_networks_list %>%
                                 normalize_score = walk_score_normalization,
                                 calculate_means = calculate_means,
                                 normalize_means = TRUE, # a second normalization of the means
-                                reduce_to_means = FALSE, # should only means be returned, dropping duplicated Nodes and their associated scores?
+                                reduce_to_means = TRUE, # should only means be returned, dropping duplicated Nodes and their associated scores?
                                 positive_scores_only = positive_scores_only,
                                 walk_score = walk_score,
                                 walk_score_measure = walk_score_measure,
