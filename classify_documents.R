@@ -17,8 +17,9 @@ classify_documents <- function(
                                       #  numeric value for a specific number
                                       #  NULL to skip
     return_walk_terms = TRUE, # should the processed walk terms be returned for further analysis and transparency?
-    return_unclassified_docs = TRUE # should the IDs of the unlassified docs be returned? 
+    return_unclassified_docs = TRUE, # should the IDs of the unlassified docs be returned? 
               # setting return_walk_terms or return_unclassified_docs to TURE returns a list of dataframes rather than a single dataframe
+    verbose = TRUE # should the number of unclassified documents be reported?
     ){
   
   ## Data and Input Checks
@@ -163,6 +164,21 @@ classify_documents <- function(
                                                     .default = policy_score))
   }
   
+  # report unclassified documents
+  if (verbose | return_unclassified_docs) {
+    unclassified_documents <- document_tokens %>% 
+      dplyr::anti_join(classified_documents, 
+                       by = dplyr::join_by(!!as.name(doc_id))) %>% 
+      dplyr::distinct(!!as.name(doc_id))
+    
+    if (verbose) {
+      cat(paste(unclassified_documents %>% nrow(), 
+                "out of",
+                document_tokens %>% distinct(!!as.name(doc_id)) %>% nrow(),
+                "documents could not be classified. \n"))
+    }
+  }
+  
   # return the result
   if (return_walk_terms | return_unclassified_docs) {
     
@@ -208,10 +224,7 @@ classify_documents <- function(
   }
   
     if (return_unclassified_docs) {
-      out$unclassified_documents <- document_tokens %>% 
-        dplyr::anti_join(classified_documents, 
-                         by = dplyr::join_by(!!as.name(doc_id))) %>% 
-        dplyr::distinct(!!as.name(doc_id))
+      out$unclassified_documents <- unclassified_documents
     }
     
     return(out)
