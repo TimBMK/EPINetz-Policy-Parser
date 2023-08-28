@@ -132,17 +132,17 @@ classify_documents <- function(
   ## classify
   
   classified_documents <- classification_terms %>%
-    dplyr::summarize(policy_score = sum(!!as.name(classification_measure)),
+    dplyr::summarize(score = sum(!!as.name(classification_measure)),
                      .by = c(!!as.name(doc_id), !!as.name(group_name))) %>% # sum policy scores by field and document
     tidyr::complete(!!as.name(doc_id),!!as.name(group_name),
-                    fill = list(policy_score = 0)) 
+                    fill = list(score = 0)) 
   
   if (!is.null(normalize_scores)) {
     if (normalize_scores == "doc") {
       # rescale the scores in documents
       classified_documents <- classified_documents %>%
         dplyr::mutate(
-          policy_score_norm = scales::rescale(policy_score, to = c(0, 1)),
+          score_norm = scales::rescale(score, to = c(0, 1)),
           .by = !!as.name(doc_id)
         )
     }
@@ -150,18 +150,18 @@ classify_documents <- function(
       # rescale the scores in groups
       classified_documents <- classified_documents %>%
         dplyr::mutate(
-          policy_score_norm = scales::rescale(policy_score, to = c(0, 1)),
+          score_norm = scales::rescale(score, to = c(0, 1)),
           .by = !!as.name(group_name)
         )
     }
   }
   
   if (!is.null(cut_lower_quantile_fields)) { # set scores to 0 for lower quantiles
-    quantile <- stats::quantile(classified_documents$policy_score, 
+    quantile <- stats::quantile(classified_documents$score, 
                                 cut_lower_quantile_fields)[[1]]
     classified_documents <- classified_documents %>% 
-      dplyr::mutate(policy_score = dplyr::case_when(policy_score < quantile ~ 0,
-                                                    .default = policy_score))
+      dplyr::mutate(score = dplyr::case_when(score < quantile ~ 0,
+                                                    .default = score))
   }
   
   # report unclassified documents
