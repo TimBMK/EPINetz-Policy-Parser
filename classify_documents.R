@@ -157,12 +157,22 @@ classify_documents <- function(
   }
   
   if (!is.null(cut_lower_quantile_fields)) { # set scores to 0 for lower quantiles
+    
     quantile <- stats::quantile(classified_documents$score, 
                                 cut_lower_quantile_fields)[[1]]
     classified_documents <- classified_documents %>% 
       dplyr::mutate(score = dplyr::case_when(score < quantile ~ 0,
                                                     .default = score))
+    
+    if(!is.null(normalize_scores)) { # set normalized scores to 0
+      quantile <- stats::quantile(classified_documents$score_norm, 
+                                  cut_lower_quantile_fields)[[1]]
+      classified_documents <- classified_documents %>% 
+        dplyr::mutate(score_norm = dplyr::case_when(score_norm < quantile ~ 0,
+                                                    .default = score))
+    } 
   }
+
   
   # report unclassified documents
   if (verbose | return_unclassified_docs) {
