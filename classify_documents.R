@@ -11,7 +11,7 @@ classify_documents <- function(
     keep_seed_terms = TRUE, # should seed terms be kept even if their score is lower than the cutoff? only applies if a cutoff is specified
     seedterm_value = NULL, # Should Seed Term Scores values be set to a fixed value for classification? NULL to skip. Otherwise enter a numerical value. Applies to classification_measure only
     normalize_scores = c("doc", "group", NULL), # should the score in the documents be normalized between 0 and 1? Can be doc (normalize within each document), group (normalize for each group), or NULL to skip
-    cut_lower_quantile_fields = NULL, # Should policy classifications within a document be cut if they fall below a certain quantile? NULL to skip. Else numerical value to specify the quantile
+    cut_lower_quantile_fields = NULL, # Should policy classifications within a document be set to 0 if they fall below a certain quantile? NULL to skip. Else numerical value to specify the quantile
     cut_frequent_group_terms = c(NULL, numeric(), "auto"),  # Should terms appearing in numerous groups be cut? 
                                       #  "auto" to cut terms appearing in more than 50% of the policy fields
                                       #  numeric value for a specific number
