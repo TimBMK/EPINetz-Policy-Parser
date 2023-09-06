@@ -430,7 +430,7 @@ calculate_network <-             # function to be mapped over timeframes
            vertex_b,
            directed = FALSE, # is the network directed?
            pmi_weight = TRUE, # should PMI weights be calculated? If TRUE, make sure vertex A and B are specified correctly
-           as_data_frame = FALSE, # should the output be returned as a data frame?
+           as_data_frame = FALSE, # should the output be returned as a data frame? removes duplicated edges (a to b | b to a)
            ...) {
     
     require(dplyr)
@@ -456,7 +456,8 @@ calculate_network <-             # function to be mapped over timeframes
     }
     
     if (as_data_frame == T) {
-      slice <- igraph::as_data_frame(slice, what = "edges") 
+      slice <- igraph::as_data_frame(slice, what = "edges") %>% 
+      dplyr::distinct(from, to, .keep_all = TRUE) # remove duplicated edges (a to b, b to a)
     } 
     
     return(slice)
