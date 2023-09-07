@@ -444,7 +444,10 @@ calculate_network <-             # function to be mapped over timeframes
           data %>%
           dplyr::select({{ vertex_a }}, {{ vertex_b }}) %>%
           widyr::pairwise_pmi_(feature =  {{vertex_a}}, item = {{vertex_b}}, sort = F) %>% dplyr::rename(weight = pmi) %>% # calculate PMI as weight (use pairwise_pmi_() avoid problems with column specification)
-          igraph::graph_from_data_frame(directed = F) # make igraph object for slice
+          igraph::graph_from_data_frame(directed = F) %>%  # make igraph object for slice
+          igraph::as_data_frame(what = "edges") %>% # temporarily convert to dataframe to identify identical a-b b-a edges
+          dplyr::distinct(from, to, .keep_all = TRUE) %>%  # remove duplicated edges introduced by PMI (a to b, b to a)
+          igraph::graph_from_data_frame(directed = F)  # back to igraph object 
       })
       
     } else {
@@ -455,9 +458,8 @@ calculate_network <-             # function to be mapped over timeframes
         igraph::graph_from_data_frame(directed = directed) # make igraph object for slice
     }
     
-    if (as_data_frame == T) {
-      slice <- igraph::as_data_frame(slice, what = "edges") %>% 
-      dplyr::distinct(from, to, .keep_all = TRUE) # remove duplicated edges (a to b, b to a)
+    if (as_data_frame) {
+      slice <- igraph::as_data_frame(slice, what = "edges")
     } 
     
     return(slice)
