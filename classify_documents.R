@@ -169,7 +169,7 @@ classify_documents <- function(
                                   cut_lower_quantile_fields)[[1]]
       classified_documents <- classified_documents %>% 
         dplyr::mutate(score_norm = dplyr::case_when(score_norm < quantile ~ 0,
-                                                    .default = score))
+                                                    .default = score_norm))
     } 
   }
 
@@ -182,10 +182,14 @@ classify_documents <- function(
       dplyr::distinct(!!as.name(doc_id))
     
     if (verbose) {
-      cat(paste(unclassified_documents %>% nrow(), 
+      unclassified <- unclassified_documents %>% nrow()
+      classified <- document_tokens %>% distinct(!!as.name(doc_id)) %>% nrow()
+      cat(paste(unclassified, 
                 "out of",
-                document_tokens %>% distinct(!!as.name(doc_id)) %>% nrow(),
-                "documents could not be classified. \n"))
+                classified,
+                "documents could not be classified", 
+                paste0("(", scales::percent(unclassified/classified), ")"),
+                "\n"))
     }
   }
   
