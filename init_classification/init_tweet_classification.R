@@ -152,6 +152,7 @@ classified_documents <- classification_result %>%
 
 classified_documents %>% 
   select(!score) %>%  # only pass the normalized score
+  rename(tweet_id = doc_id) %>% # rename for clarity
   pivot_wider(names_from = policy_field, values_from = score_norm) %>% # wide format (1 column per policy field)
   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
   vroom_write("init_classified_tweets_wide.csv.tar.gz")
