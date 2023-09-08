@@ -136,44 +136,49 @@ unclassified_docs <- classification_result %>%
           {dat$unclassified_documents %>% distinct(doc_id) %>% nrow()}) %>% 
   sum()
 
-
-cat(paste(unclassified_docs, "out of", classified_docs, "documents classified",
-          paste0("(", percent(unclassified_docs/classified_docs), 
+cat(paste(unclassified_docs, "out of", 
+          (unclassified_docs + classified_docs), 
+          "documents classified",
+          paste0("(", percent(unclassified_docs/
+                                (unclassified_docs + classified_docs)), 
                  " unclassified)")))
 
 
-classification_result$classified_documents %>%
-  inner_join(tweets %>% filter(!str_detect(`_source.text`, "^RT ")) %>% # drops RTs
-               select(`_id`, `_source.text`, `_source.created_at`),
-             by = join_by(doc_id == `_id`)) %>%
-  slice_max(policy_score, n = 20, # set number of documents returned per field with n = ...
-            by = policy_field) %>%
-  View()
-
-#### to normalize or not to normalize?
-classification_result$classified_documents %>%
-  inner_join(tweets %>% filter(!str_detect(`_source.text`, "^RT ")) %>% # drops RTs
-               select(`_id`, `_source.text`, `_source.created_at`),
-             by = join_by(doc_id == `_id`)) %>%
-  slice_max(policy_score_norm, n = 20, # set number of documents returned per field with n = ...
-            by = policy_field) %>%
-  View()
-
-
-
-classification_result$unclassified_documents %>%
-  left_join(tweets %>% select(`_id`, `_source.text`, `_source.created_at`),
-             by = join_by(doc_id == `_id`)) %>%
-  View()
-
-
-# make list of named vectors to pass to HD
+# make csv dataframe of tweets to pass to HD
 classified_documents <- classification_result %>%
   map(\(dat)
       dat$classified_documents) %>%
   rbindlist()
 
-hd_pass <- tibble(tweet_id = classified_documents$doc_id,
-                  policy_classification = setNames(as.character(classified_documents$policy_score),
-                                                   as.character(classified_documents$policy_field)))
+classified_documents %>% 
+  select(!score) %>%  # only pass the normalized score
+  pivot_wider(names_from = policy_field, values_from = score_norm) %>% # wide format (1 column per policy field)
+  mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
+  vroom_write("init_classified_tweets_wide.csv.tar.gz")
+
+# # Additional checks
+# classification_result$classified_documents %>%
+#   inner_join(tweets %>% filter(!str_detect(`_source.text`, "^RT ")) %>% # drops RTs
+#                select(`_id`, `_source.text`, `_source.created_at`),
+#              by = join_by(doc_id == `_id`)) %>%
+#   slice_max(policy_score, n = 20, # set number of documents returned per field with n = ...
+#             by = policy_field) %>%
+#   View()
+# 
+# #### to normalize or not to normalize?
+# classification_result$classified_documents %>%
+#   inner_join(tweets %>% filter(!str_detect(`_source.text`, "^RT ")) %>% # drops RTs
+#                select(`_id`, `_source.text`, `_source.created_at`),
+#              by = join_by(doc_id == `_id`)) %>%
+#   slice_max(policy_score_norm, n = 20, # set number of documents returned per field with n = ...
+#             by = policy_field) %>%
+#   View()
+# 
+# 
+# 
+# classification_result$unclassified_documents %>%
+#   left_join(tweets %>% select(`_id`, `_source.text`, `_source.created_at`),
+#              by = join_by(doc_id == `_id`)) %>%
+#   View()
+# 
 

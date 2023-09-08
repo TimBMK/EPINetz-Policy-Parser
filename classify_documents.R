@@ -183,12 +183,12 @@ classify_documents <- function(
     
     if (verbose) {
       unclassified <- unclassified_documents %>% nrow()
-      classified <- document_tokens %>% distinct(!!as.name(doc_id)) %>% nrow()
+      total <- document_tokens %>% distinct(!!as.name(doc_id)) %>% nrow()
       cat(paste(unclassified, 
                 "out of",
-                classified,
+                total,
                 "documents could not be classified", 
-                paste0("(", scales::percent(unclassified/classified), ")"),
+                paste0("(", scales::percent(unclassified/total), ")"),
                 "\n"))
     }
   }
