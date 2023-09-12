@@ -6,14 +6,14 @@
 ##  Should not be used to process multiple samples/time frames, as it would unnecessarily reproduce certain steps
 
 walk_terms_workflow <- function(
-    tokens, # tokens object. Expects tokenized data returned by the tokenizer workflow
+    tokens = get_latest_tokens_file(), # tokens object. Expects tokenized data returned by the tokenizer workflow
     seed_terms, # seeds objects. Expects a liste with the named dataframes "seed_terms_ministries", "seed_term_committees" and "seed_term_committee_members"
     date = Sys.Date(), # date for filtering purposes (max date
     walk_replies = FALSE, # should replies be utilized?
     walk_mentions = TRUE, # should mentions be utilizued?
     walk_urls = TRUE, # should URLs be utilized?
     time_frame_walks = weeks(12), # length of the time frame for random walk term extraction
-    drop_quantile = 0.1, # what quantile should be dropped from the token counts? NULL to skip
+    quantile_drop = 0.1, # what quantile should be dropped from the token counts? NULL to skip
     walk_score_normalization = "seeds", # Should scores be normalized? "seeds" to normalize the scores for each seed walk. "group" to normalize within grouping vars. Set to NULL for no normalization. 
     calculate_means = TRUE, # should the means of the score be calculated and displayed? The can also be used for minimum walk_score filtering (see below)
     normalize_means = TRUE, # a second normalization of the means
@@ -41,8 +41,6 @@ walk_terms_workflow <- function(
   
   
   # some checks
-  
-  rlang::arg_match(normalize_score) # check for correct argument specification here
   
   expected_tokens_cols <- c("doc_id", "lemma", "tag", "is_reply", "_source.created_at", "_source.author_id")
   if (any(!(expected_tokens_cols %in% colnames(tokens)))) {
@@ -92,7 +90,7 @@ walk_terms_workflow <- function(
   {
     walk_NE <- drop_quantile(walk_NE,
                              tokens = "lemma",
-                             quantile = drop_quantile,
+                             quantile = quantile_drop,
                              ignore_case = FALSE, # case is already lowered
                              group = "tag",
                              verbose = verbose)
@@ -137,10 +135,11 @@ walk_terms_workflow <- function(
   
   # Compute Random Walks
   
-  walk_terms <-  get_rwr_terms(network_name = network_name,
-                               seeds = seeds,
+  walk_terms <-  get_rwr_terms(walk_network = future::value(walk_network),
+                               network_name = NULL, # not required for a single period
+                               seeds = future::value(seeds),
                                seed_var = "feature",
-                               match_var = "period",
+                               match_var = NULL, # not required for a single period
                                flatten_results = TRUE,
                                group_name = "policy_field",
                                normalize_score = walk_score_normalization,

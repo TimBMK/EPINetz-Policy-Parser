@@ -6,7 +6,7 @@
 ##  Should not be used to process multiple samples/time frames, as it would unnecessarily reproduce certain steps
 
 seed_terms_workflow <- function(
-    tokens,          # tokens object. Expects tokenized data returned by the tokenizer workflow
+    tokens = get_latest_tokens_file(), # tokens object. Expects tokenized data returned by the tokenizer workflow
     ministries,      # ministry account list
     committees,      # committee account list
     dir = NULL,             # subdirectory to save results in. NULL to skip
