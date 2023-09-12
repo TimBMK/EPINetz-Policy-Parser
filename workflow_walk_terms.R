@@ -14,10 +14,17 @@ walk_terms_workflow <- function(
     walk_urls = TRUE, # should URLs be utilized?
     time_frame_walks = weeks(12), # length of the time frame for random walk term extraction
     drop_quantile = 0.1, # what quantile should be dropped from the token counts? NULL to skip
-    positive_scores_only = TRUE, # Drop Score below 0 before Normalization?
-    normalize_score = c(NULL, "seeds", "group", "group_mean"), # How should scores be normalized? Always applied before score filtering
-    walk_score = 0.9, # Minimum normalized Random Walk Score for Random Walk Terms
-    keep_seed_terms = TRUE, # Should seed terms be kept, regardless of their their walk score?
+    walk_score_normalization = "seeds", # Should scores be normalized? "seeds" to normalize the scores for each seed walk. "group" to normalize within grouping vars. Set to NULL for no normalization. 
+    calculate_means = TRUE, # should the means of the score be calculated and displayed? The can also be used for minimum walk_score filtering (see below)
+    normalize_means = TRUE, # a second normalization of the means
+    reduce_to_means = TRUE, # should only means be returned, dropping duplicated Nodes and their associated scores?
+    positive_scores_only = TRUE, # should negative Walk Scores (i.e. very unlikely connection due to negative weights) and 0 scores be dropped? Applied before normalization
+    walk_score = 0.9, # cutoff value for normalized random walk score. Non-Null Values require the selection of a measure to filter on if more than one walk_score_normalization method is picked
+    walk_score_measure = "seeds_mean", # value to apply the walk_score filter on. 
+    # Possible are: "default" (auto-pick), "raw" (non-normalized rwr score), "seeds" (seed normalized), "seeds_mean" (mean of seed normalized), "group" (group normalized), "group_mean" (mean of group normalized). Needs to be specified if more than one 
+    walk_score_quantile = TRUE, # Should the quantile be calculated as a dynamic minimum walk_score for each group? If TRUE, walk_score specifies the quantile, rather than a fixed value. Cutoff values may differ from group to group
+    keep_seed_terms = TRUE, # should seed terms within the policy field of the same period always be kept, regardless of walk score?
+    seedterm_value = NULL, # should the actual value of seed terms be overwritten by a default value, e.g. 1? NULL to skip
     seed = as.numeric(date), # seed to prevent RNG issues in parallelization. by default the numeric conversion of the date 
     verbose = F
 )
@@ -130,18 +137,24 @@ walk_terms_workflow <- function(
   
   # Compute Random Walks
   
-  walk_terms <- get_rwr_terms(value(walk_network),
-                              network_name = NULL,
-                              seeds = value(seeds), 
-                              seed_var = "feature",
-                              match_var = NULL,
-                              flatten_results = TRUE,
-                              group_name = "policy_field",
-                              normalize_score = normalize_score,
-                              positive_scores_only = positive_scores_only,
-                              walk_score = walk_score,
-                              keep_seed_terms = keep_seed_terms,
-                              progress = verbose) 
+  walk_terms <-  get_rwr_terms(network_name = network_name,
+                               seeds = seeds,
+                               seed_var = "feature",
+                               match_var = "period",
+                               flatten_results = TRUE,
+                               group_name = "policy_field",
+                               normalize_score = walk_score_normalization,
+                               calculate_means = calculate_means,
+                               normalize_means = normalize_means, # a second normalization of the means
+                               reduce_to_means = reduce_to_means, # should only means be returned, dropping duplicated Nodes and their associated scores?
+                               positive_scores_only = positive_scores_only,
+                               walk_score = walk_score,
+                               walk_score_measure = walk_score_measure,
+                               walk_score_quantile = walk_score_quantile,
+                               report_quantiles = verbose,
+                               keep_seed_terms = keep_seed_terms,
+                               seedterm_value = seedterm_value, # should the actual value of seed terms be overwritten by a default value, e.g. 1? NULL to skip
+                               progress = verbose) 
   
   ## The terms returned for 'normalize_score = "seeds"' include duplicates, esp. seed terms with keep_seed_terms = TRUE
   
