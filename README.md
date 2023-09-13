@@ -6,9 +6,9 @@ Der Policy Parser besitzt zwei Hauptbestandteile: Regelmäßige, automatisierte 
 
 Da der Zugriff auf die Twitter API für Forschende bis auf weiteres gesperrt ist, findet keine Live-Klassifizierung statt. Stattdessen wurde der Prozess für den Zeitraum von Oktober 2017 (Beginn der 19. Legislaturperiode) bis zum Ende des Datenzugriffs am 22.6.2023 simuliert. Die Twitterdaten basieren auf dem [EPINetz Twitter Politicians Dataset 2021](https://doi.org/10.1007/s11615-022-00405-7) und dessen [Erweiterung bis zum Jahr 2023](https://doi.org/10.7802/2415) (inkl. der Wiederholungswahlen in Berlin). 
 
-Workflows für die regelmäßige Klassifikation von Dokumenten via API finden sich unter **regular_workflow**.
+Workflows für die regelmäßige Klassifikation von Dokumenten via API finden sich unter **regular_classification**.
 
-Die Dokumentation der initialen Evaluation aller verfügbaren Twitterdaten seit Oktober 2017 findet sich unter **init_evaluation**.
+Die Dokumentation der initialen Evaluation aller verfügbaren Twitterdaten seit Oktober 2017 findet sich unter **init_classification**.
 
 Die Daten wurden über die Heidelberger EPINetz Database bezogen.
 
