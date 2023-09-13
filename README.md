@@ -8,11 +8,15 @@ Da der Zugriff auf die Twitter API für Forschende bis auf weiteres gesperrt ist
 
 Workflows für die regelmäßige Klassifikation von Dokumenten via API finden sich unter **regular_classification**.
 
-Die Dokumentation der initialen Evaluation aller verfügbaren Twitterdaten seit Oktober 2017 findet sich unter **init_classification**.
+Die Dokumentation der initialen Klassifikation aller verfügbaren Twitterdaten seit Oktober 2017 findet sich unter **init_classification**.
 
 Die Daten wurden über die Heidelberger EPINetz Database bezogen.
 
 Ein ausführlicher qualitativer Evaluationsprozess, welcher in den Issues dieses Repositoriums dokumentiert ist, wurde durchgeführt, um den Prozess zu finetunen und optimale Werte für das Modell zu wählen.
+
+Erstellung des Prototypen für den Klassifizierungsprozess: Erik Wolfes-Wenker & Tim König
+Erstellung der Funktionen, Workflows und Skripte für Evaluation, regelmäßige und initiale Klassifikation: Tim König
+Qualitative Evaluation der Ergebnisse und Finetuning der Parameter: Erik Wolfes-Wenker, Marco Gronewold & Quentin Bukold
 
 ## 0. Tokenization 
 
