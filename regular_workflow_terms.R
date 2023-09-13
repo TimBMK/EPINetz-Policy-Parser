@@ -30,7 +30,9 @@ plan(multisession, workers = 16) # set up future multisession for future_map fun
 date <- Sys.Date()
 
 # subdirectory to save results in
-dir <- "regular_classification/"
+dir <- file.path("regular_classification", date)
+
+dir.create(dir)
 
 
 # set verbosity
@@ -110,13 +112,9 @@ walk_terms <- walk_terms_workflow(tokens = tokens, # tokens object. Expects toke
 
 #### save ####
 
-path <- file.path("regular_classification", date)
-
-dir.create(path)
-
 walk_terms %>% 
   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
-  vroom_write(file.path(path, paste0("policy_terms_", date, ".csv")))
+  vroom_write(file.path(dir, paste0("walk_terms_", date, ".csv")))
   
 
   

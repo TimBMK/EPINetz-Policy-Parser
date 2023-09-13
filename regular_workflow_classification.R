@@ -17,16 +17,46 @@
 
 source("/data/koenigt/Tools-Scripts/Tools & Scripts/elasticsearch_scrolledsearch.R") # scrolled search function
 
+source("classify_documents.R")
+
 tweet_ids <- "..." # tweet IDs of tweets to be classified
 
 plan(multisession, workers = 4) # set up future multisession for future_map functions
 
 
-classification_replies <- FALSE # should replies get classified?
+## settings
 
-classification_mentions <- TRUE # should mentions be utilized? adviced to keep this in line with walk_mentions
+classification_timeframe = "weeks" # weeks(1) bugs out (lubridate bug) # length of the timeframe for the classification, e.g. one week before the RWR timeframe
+classification_before_after = "before" # set if the classification_timeframe is before or after the rwr_timeframe, e.g. the week before or after. "after" to for after, "before" for before
 
-classification_urls <- TRUE # should urls be utilized? adviced to keep this in line with walk_urls
+# What data should be used in the classification? This defaults to the RWR settings
+classification_replies = FALSE # should replies get classified?
+classification_mentions = TRUE # should mentions be utilized? adviced to keep this in line with walk_mentions (TRUE)
+classification_urls = TRUE # should urls be utilized? adviced to keep this in line with walk_urls (TRUE)
+
+classification_measure = "ScoreNormMean" # one of ScoreNorm, ScoreNormMean, ScoreNormGroup, ScoreNormGroupMean, or (for raw scores) Score or ScoreMean
+                                         #  this should correspond to (one of) the score(s) calculated during the random walks
+
+cutoff = NULL # Should an additional cutoff be set? Applies to classification measure. NULL to skip
+
+seedterm_value = NULL # Should Seed Term Scores values be set to a fixed value for classification? NULL to skip. Otherwise enter a numerical value. Applies to classification_measure only
+
+keep_seed_terms = NULL
+
+cut_frequent_policy_terms = NULL  # Should terms appearing in numerous policy field be cut? 
+#  "auto" to cut terms appearing in more than 50% of the policy fields
+#  numeric value for a specific number
+#  NULL to skip
+
+cut_lower_quantile_fields = 0.1 # Should policy classifications within a document be cut if they fall below a certain quantile? NULL to skip. Else numerical value to specify the quantile
+
+normalize_scores = "group" # should the score in the documents be normalized between 0 and 1? Can be "doc" (normalize within each document), "group" (normalize for each group), or NULL to skip
+
+return_walk_terms = TRUE # should the processed walk terms be returned for further analysis and transparency?
+
+return_unclassified_docs = TRUE # should the IDs of the unlassified docs be returned? 
+
+
 
 
 # Read lists
@@ -35,16 +65,24 @@ committees <- read_csv("Seed_Accounts/committee_seeds_19-20_2023-04-06.csv", col
 epinetz_accounts <- readRDS("EPINetz_full_collection_list_update_11.RDS") # list of all EPINetz Accounts
 
 # Get Terms
-files <- list.files("regular_classification/")
-latest_terms <- tibble(file = files) %>% 
-  filter(str_detect(files, "walk_terms_\\d+.*")) %>% # filter for walk_terms files with a date
-  slice_max(file) %>%  # pick the latest walk_terms file available
+latest_results <- tibble(folder = list.dirs("regular_classification")) %>% 
+  filter(str_detect(folder, "\\d+.*")) %>% # filter for folders with a date
+  slice_max(folder) %>%  # pick the latest walk_terms file available
   pull()
 
-walk_terms_means <- vroom(file.path("regular_classification/", latest_terms))
+latest_walk_terms <- latest_results %>% list.files() %>% 
+  .[str_detect(., "walk_terms")]
+
+walk_terms <- vroom(file.path(latest_results, 
+                              latest_walk_terms))
 
 
+# some checks
 
+if (!(classification_measure %in% names(walk_terms))) {
+  stop(paste(classification_measure, "not found in latest walk terms.", 
+              "Respecify the classification_measure or make sure the walk terms contain the desired measure."))
+}
 
 
 # connect to Heidelberg Database via Tunnel. In Bash, use:
