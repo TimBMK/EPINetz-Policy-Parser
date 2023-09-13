@@ -14,10 +14,6 @@ Die Daten wurden über die Heidelberger EPINetz Database bezogen.
 
 Ein ausführlicher qualitativer Evaluationsprozess, welcher in den Issues dieses Repositoriums dokumentiert ist, wurde durchgeführt, um den Prozess zu finetunen und optimale Werte für das Modell zu wählen.
 
-Erstellung des Prototypen für den Klassifizierungsprozess: Erik Wolfes-Wenker & Tim König
-Erstellung der Funktionen, Workflows und Skripte für Evaluation, regelmäßige und initiale Klassifikation: Tim König
-Qualitative Evaluation der Ergebnisse und Finetuning der Parameter: Erik Wolfes-Wenker, Marco Gronewold & Quentin Bukold
-
 ## 0. Tokenization 
 
 Regelmäßige Tokenisierung der (neuen) Dokumente via Spacy / SpacyR. Neben einer vollständigen Database wird ein reduzierter Datensatz erstellt, welcher nur den maximal benötigten Zeitraum von einem Jahr beinhaltet. 
@@ -86,3 +82,14 @@ Die so berechneten Politikfelder lassen sich als Netzwerke visualisieren, bei de
 ## Zusätzliche Hilfsfunktionen
 
 **utils_text_processing.R** enthält eine Reihe von Hilfsfunktionen, um Tokens und Dokumente zu verarbeiten
+
+## Credits
+Erstellung des Prototypen für den Klassifizierungsprozess: Erik Wolfes-Wenker & Tim König
+
+Erstellung der Funktionen, Workflows und Skripte für Evaluation, regelmäßige und initiale Klassifikation: Tim König
+
+Qualitative Evaluation der Ergebnisse und Finetuning der Parameter: Erik Wolfes-Wenker, Marco Gronewold & Quentin Bukold
+
+Random Walk Algorithmus: [Alberto Valdeolivas](https://github.com/alberto-valdeolivas/RandomWalkRestartMH)
+> A Valdeolivas, L Tichit, C Navarro, S Perrin, G Odelin, N Levy, P Cau, E Remy, and A Baudot. 2018. “Random walk with restart on multiplex and heterogeneous biological networks.” Bioinformatics 35 (3)
+
