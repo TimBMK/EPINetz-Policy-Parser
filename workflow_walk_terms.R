@@ -88,6 +88,10 @@ walk_terms_workflow <- function(
   ## droppercentile of counts
   if (!is.null(drop_quantile))
   {
+    if(verbose){
+      cat("\nRemoving lower Token Quantiles:\n")
+    }
+    
     walk_NE <- drop_quantile(walk_NE,
                              tokens = "lemma",
                              quantile = quantile_drop,
@@ -132,6 +136,35 @@ walk_terms_workflow <- function(
   rm(walk_NE)
   gc(verbose = FALSE)
   
+  if (verbose) {
+    # make internal indicators for the verbose loop
+    cat("..")
+    seeds_done <-  FALSE 
+    networks_done <- FALSE
+
+    while(any(!(future::resolved(seeds)) |
+              !(future::resolved(walk_network)))) {
+      cat(".")
+      
+      Sys.sleep(0.5)
+      
+      if (future::resolved(seeds) & 
+          seeds_done == FALSE) {
+        cat("Seed preparation done")
+        seeds_done <-  TRUE
+      }
+      
+      if (future::resolved(walk_network) & 
+          networks_done == FALSE) {
+        cat("Network calculation done")
+        networks_done <- TRUE
+      }
+      
+    }
+    
+    cat("...Calculating Random Walks...\n")
+    
+  }
   
   # Compute Random Walks
   
