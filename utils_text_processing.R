@@ -90,8 +90,8 @@ filter_tokens <- function(tokens,
                           stopword_dictionary = "snowball", # stopword dictionary to be used. See stopwords::stopwords()
                           additional_stopwords = c("amp", "&amp", "RT", "rt", "--", "---"), # provide additional stopwords to drop here
                           replies = NULL, # should replies be considered for the random walks? Expects a column named is_reply. NULL to skip  
-                          keep_mentions = TRUE, # should @-mentions be filtered out?
-                          keep_urls = TRUE # should URLs be filtered out?
+                          keep_mentions = TRUE, # should @-mentions be filtered out? NULL to skip
+                          keep_urls = TRUE # should URLs be filtered out? NULL to skip
                           ) {
   
   require(dplyr)
@@ -163,12 +163,12 @@ filter_tokens <- function(tokens,
     dplyr::filter(is_reply == replies | is_reply == FALSE) # filter for reply condition (TRUE includes replies, FALSE does not)
   }
   
-  if (keep_mentions == FALSE) {
+  if (!is.null(keep_mentions) && keep_mentions == FALSE) {
     tokens <- tokens %>%
       dplyr::filter(!stringr::str_detect(!!as.name(tokens_col), "@")) # drop all lemmas containing "@" - that is, all mentions
   }
 
-  if (keep_urls == FALSE) {
+  if (!is.null(keep_urls) && keep_urls == FALSE) {
     tokens <- tokens %>%
       dplyr::filter(!stringr::str_detect(!!as.name(tokens_col), "http"))  # drop all URLs
   }
