@@ -257,6 +257,7 @@ top_group_terms <- function( # a function to print the top terms for each group 
     classification_measure, # the classification measure to be used for selecting the top terms
     print_seed_terms = TRUE,
     n = 20, # the number of terms to print
+    with_ties = TRUE, # tie handling (see dplyr::slice_max) 
     mode = c("print", "return") # should the results be printed out a dataframe of results be returned?
 ){
   
@@ -297,14 +298,15 @@ top_group_terms <- function( # a function to print the top terms for each group 
     purrr::iwalk(\(group, name)
           {cat(paste0("\n", group_name, " ", name, ":\n"))
             group %>% dplyr::slice_max(order_by = !!as.name(classification_measure), 
-                                n = n) %>% 
+                                n = n, with_ties = with_ties) %>% 
               dplyr::select(!dplyr::any_of(group_name)) %>% print()})}
   
   # Return data
   if (mode == "return") {
     walk_terms %>% 
       dplyr::slice_max(order_by = !!as.name(classification_measure), 
-                       n = n, by = !!as.name(group_name)) %>% 
+                       n = n, with_ties = with_ties,
+                       by = !!as.name(group_name)) %>% 
       return()
   }
 }
@@ -317,6 +319,7 @@ top_group_documents <- function( # a function to print the top documents for eac
   group_name, # the name of the group variable, e.g. "policy_field"
   classification_score, # the classification score to be used for selecting the top documents
   n = 20, # the number of documents to print per group
+  with_ties = TRUE, # tie handling (see dplyr::slice_max) 
   mode = c("print", "return") # should the results be printed out a dataframe of results be returned?
 ){
   
@@ -357,7 +360,7 @@ top_group_documents <- function( # a function to print the top documents for eac
                    {cat(paste0("\n", group_name, " ", name, ":\n"))
                      group %>%  
                        dplyr::slice_max(order_by = !!as.name(classification_score), 
-                                        n = n) %>% 
+                                        n = n, with_ties = with_ties) %>% 
                        dplyr::left_join(documents, by = doc_id) %>% 
                        dplyr::select(!dplyr::any_of(group_name)) %>% # drop group name from printout
                        dplyr::relocate({{classification_score}}, # score first
@@ -370,7 +373,8 @@ top_group_documents <- function( # a function to print the top documents for eac
   if (mode == "return") {
     classified_documents %>% 
       dplyr::slice_max(order_by = !!as.name(classification_score), 
-                       n = n, by = !!as.name(group_name)) %>% 
+                       n = n, with_ties = with_ties,
+                       by = !!as.name(group_name)) %>% 
       dplyr::left_join(documents, by = doc_id) %>% 
       dplyr::relocate({{group_name}}, # group and score first
                       {{classification_score}}, 
