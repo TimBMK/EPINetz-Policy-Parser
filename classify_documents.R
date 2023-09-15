@@ -137,6 +137,23 @@ classify_documents <- function( # the working horse function to classify documen
     tidyr::complete(!!as.name(doc_id),!!as.name(group_name),
                     fill = list(score = 0)) 
   
+  
+  
+  if (!is.null(cut_lower_quantile_fields)) { # set scores to 0 for lower quantiles
+    
+    quantile <- stats::quantile(classified_documents$score, 
+                                cut_lower_quantile_fields)[[1]]
+    classified_documents <- classified_documents %>% 
+      dplyr::mutate(score = dplyr::case_when(score < quantile ~ 0,
+                                             .default = score))
+    
+    if (verbose) {
+      cat(paste0("Setting score-values below ",
+                 quantile, " (", cut_lower_quantile_fields, 
+                 " quantile) to 0. This step is applied before normalization.\n"))
+    }
+  }
+  
   if (!is.null(normalize_scores)) {
     if (normalize_scores == "doc") {
       # rescale the scores in documents
@@ -154,24 +171,13 @@ classify_documents <- function( # the working horse function to classify documen
           .by = !!as.name(group_name)
         )
     }
-  }
-  
-  if (!is.null(cut_lower_quantile_fields)) { # set scores to 0 for lower quantiles
     
-    quantile <- stats::quantile(classified_documents$score, 
-                                cut_lower_quantile_fields)[[1]]
+    # set the normalized score 0 to when the score is 0. This prevents documents with 0 in all groups to show as 0.5 in the score_norm
     classified_documents <- classified_documents %>% 
-      dplyr::mutate(score = dplyr::case_when(score < quantile ~ 0,
-                                                    .default = score))
-    
-    if(!is.null(normalize_scores)) { # set normalized scores to 0
-      quantile <- stats::quantile(classified_documents$score_norm, 
-                                  cut_lower_quantile_fields)[[1]]
-      classified_documents <- classified_documents %>% 
-        dplyr::mutate(score_norm = dplyr::case_when(score_norm < quantile ~ 0,
-                                                    .default = score_norm))
-    } 
+      dplyr::mutate(score_norm = dplyr::case_when(score == 0 ~ 0,
+                                    .default = score_norm))
   }
+
 
   
   # report unclassified documents
