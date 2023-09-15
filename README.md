@@ -1,10 +1,18 @@
 # EPINetz-Policy-Parser
 
+Der hier vorliegende Code dokumentiert die Funktionsweise des Policy Parsers, wie er auf der [EPINetz-Plattform](https://app.epinetz.de/) zum Einsatz kommt und ist Teil des [EPINetz-Projekts](https://epinetz.de/). Er dient der vollautomatisierten Klassifizierung von Dokumenten wie Tweets in die 18 Politkfelder **Außenpolitik, Arbeit, Bildung & Forschung, Digitalisierung & Technik, Entwicklungspolitik, Europapolitik, Finanzen & Haushalt, Gesellschaftspolitik, Gesundheitspolitik, Haushalt & Finanzen, Innere Sicherheit, 'Kultur, Medien, Sport', Landwirtschaft & Ernährung, Sozialpolitik, Umweltpolitik, Verkehrspolitik, Verteidigungspolitik und Wirtschaftspolitik**. 
+
+Dazu wird auf ein zweischrittiges Verfahren zurückgegriffen, bei dem für jedes Politikfeld zunächst eine Reihe an Seedtermen extrahiert wird, auf deren Grundlage mittels Random Walks weitere relevante Terme extrahiert werden. Auf Grundlage dieser erweiterten Termliste werden die Dokumente nach Relevanz und Vorkommen der Terme klassifiziert. Die Seedterme werden auf Grundlage der Tweets der sogenannten Seedaccounts gebildet, welche diese innerhalb eines Jahres verfasst haben. Die Seedaccounts sind für jedes Politikfeld spezifisch und setzen sich aus den Accounts der a) zuständigen Ministerien und b) Mitgliedern der Bundestagsausschüsse zu einzelnen Politikbereichen zusammen. Um die Seedterme zu bilden, werden mittels Chi^2-Werten für jeden Account bzw. jede Accountgruppe die relevantesten Terme extrahiert. Auf Grundlage dieser Seedterme werden dann für 3 Monate mittels Random Walks weitere, für das Politikfeld relevante Terme extrahiert, indem besonders stark mit den Seedtermen verbundene Terme identifiziert werden. Spezifisch werden für alle Seedterme eines Politikfelds Random Walks durchgeführt, für jeden Term der normalisierte Mittelwert über alle Random Walks eines Politikfelds berechnet und die Terme mit den höchsten Scores (die 90% Quantile) extrahiert. Die Grundlage für das Random Walk Verfahren bilden PMI-gewichtete Textnetzwerke (auch semantische Netzwerke genannt) aus Nounwords (Nomen und Eigennamen), deren Kanten die Wahrscheinlichkeit repräsentieren, dass zwei Terme in demselben Dokument vorkommen. Für die Klassifikation von Tweets bestehen diese Textnetzwerke aus den Tweets aller deutschen Politiker:innen aus der EPINetz-Datenbank. Mittels dieser erweiterten Termliste werden die Dokumente eines Zeitraums (idR. einer Woche) klassifiziert, indem die in einem die Politikfeldscores der Terme in einem Dokument aufaddiert werden.
+
 # Workflow
 
 Der Policy Parser besitzt zwei Hauptbestandteile: Regelmäßige, automatisierte Updates der Termlisten (im live-Betrieb via Cronjobs) und die Klassifizierung neuer Dokumente in Echtzeit. Während die Updates der Termlisten vergleichsweise ressourcenintensiv sind, ist das Berechnen der Policy Scores in den Dokumenten wenig aufwändig, da lediglich diese lediglich in ihre Tokens zerlegt,* diese Tokens mit den Termlisten abgeglichen und darauf basierend die Gesamtscore berechnet wird.
 
 Da der Zugriff auf die Twitter API für Forschende bis auf weiteres gesperrt ist, findet keine Live-Klassifizierung statt. Stattdessen wurde der Prozess für den Zeitraum von Oktober 2017 (Beginn der 19. Legislaturperiode) bis zum Ende des Datenzugriffs am 22.6.2023 simuliert. Die Twitterdaten basieren auf dem [EPINetz Twitter Politicians Dataset 2021](https://doi.org/10.1007/s11615-022-00405-7) und dessen [Erweiterung bis zum Jahr 2023](https://doi.org/10.7802/2415) (inkl. der Wiederholungswahlen in Berlin). 
+
+Workflows für die regelmäßige Klassifikation von Dokumenten via API finden sich unter **regular_classification**.
+
+Die Dokumentation der initialen Klassifikation aller verfügbaren Twitterdaten seit Oktober 2017 findet sich unter **init_classification**.
 
 Die Daten wurden über die Heidelberger EPINetz Database bezogen.
 
@@ -78,3 +86,14 @@ Die so berechneten Politikfelder lassen sich als Netzwerke visualisieren, bei de
 ## Zusätzliche Hilfsfunktionen
 
 **utils_text_processing.R** enthält eine Reihe von Hilfsfunktionen, um Tokens und Dokumente zu verarbeiten
+
+## Credits
+Erstellung des Prototypen für den Klassifizierungsprozess: Erik Wolfes-Wenker & Tim König
+
+Erstellung der Funktionen, Workflows und Skripte für Evaluation, regelmäßige und initiale Klassifikation: Tim König
+
+Qualitative Evaluation der Ergebnisse und Finetuning der Parameter: Erik Wolfes-Wenker, Marco Gronewold & Quentin Bukold
+
+Random Walk Algorithmus: [Alberto Valdeolivas](https://github.com/alberto-valdeolivas/RandomWalkRestartMH)
+> A Valdeolivas, L Tichit, C Navarro, S Perrin, G Odelin, N Levy, P Cau, E Remy, and A Baudot. 2018. “Random walk with restart on multiplex and heterogeneous biological networks.” Bioinformatics 35 (3)
+
