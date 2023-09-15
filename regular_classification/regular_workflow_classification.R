@@ -219,60 +219,38 @@ if (!is.null(normalize_scores)){ # if the scores were normalized, results will c
 
 # return walk terms (quality control)
 if (!is.null(print_walk_terms)) {
-  cat(paste("\nTop", return_n, "Terms per Policy Field:\n"))
-  
-  classification_result %>% .[["walk_terms"]] %>% 
-    as.data.table() %>% split(by = "policy_field") %>% 
-    iwalk(\(group, name)
-        {cat(paste0("\nPolicy Field ",name, ":\n"))
-          group %>% slice_max(order_by = !!as.name(classification_measure), 
-                              n = print_walk_terms) %>% 
-            select(!policy_field) %>% print()})
+  top_group_terms(classification_result,
+                  group_name = "policy_field",
+                  classification_measure = classification_measure,
+                  print_seed_terms = TRUE,
+                  n = print_walk_terms,
+                  mode = "print")
 }
 
 # Check highest ranking policy fields for tweets (quality control)
 if (!is.null(print_example_docs)) {
   
-  cat(paste("\nTop", return_n, "Tweets per Policy Field:\n"))
-  
-  classification_result %>% .[["classified_documents"]] %>% 
-    as.data.table() %>% split(by = "policy_field") %>% 
-    iwalk(\(group, name)
-          {cat(paste0("\nPolicy Field ",name, ":\n"))
-            group %>%  inner_join(tweets %>% filter(!str_detect(`_source.text`, "^RT ")) %>% # drops RTs
-                 select(`_id`, `_source.text`, `_source.created_at`), 
-               by = join_by(doc_id == `_id`)) %>% 
-              slice_max(order_by = !!as.name(score), 
-                        n = print_example_docs) %>% 
-              select(doc_id,  `_source.created_at`, {{score}}, `_source.text`) %>% 
-              print()
-            cat("\n===========================================\n")})
+  top_group_documents(classification_result,
+                            documents = tweets %>% 
+                              filter(!str_detect(`_source.text`, "^RT ")) %>% # drops RTs
+                              select(`_id`, `_source.text`, `_source.created_at`), # and only keep a few variables
+                            doc_id = join_by(doc_id == `_id`),
+                            group_name = "policy_field",
+                            classification_score = score,
+                            n = print_example_docs,
+                            mode = "print"
+                            )
 }
 
 # Check unclassified tweets
 if (!is.null(print_unclassified_docs)) {
-  if (print_unclassified_docs < nrow(classification_result$unclassified_documents)){ 
-    # return sample...
-    cat(paste("\nRandom Sample of", return_n, "out of", 
-              nrow(classification_result$unclassified_documents),
-              "unclassified Tweets:\n"))
-    classification_result$unclassified_documents %>% 
-      left_join(tweets %>% select(`_id`, `_source.text`, `_source.created_at`), 
-                by = join_by(doc_id == `_id`)) %>% 
-      slice_sample(n = return_n) %>% 
-      select(doc_id,  `_source.created_at`, `_source.text`) %>% 
-      print()
-  } else {
-    # ... or return all unclassified documents if n_return >= nr of unclassified docs
-    cat(paste("\nReturning all", 
-              nrow(classification_result$unclassified_documents),
-              "unclassified Tweets:\n"))
-    classification_result$unclassified_documents %>% 
-      left_join(tweets %>% select(`_id`, `_source.text`, `_source.created_at`), 
-                by = join_by(doc_id == `_id`)) %>% 
-      select(doc_id,  `_source.created_at`, `_source.text`) %>% 
-      print()
-  }
+  
+  get_unclassified_documents(classification_result,
+                             documents = tweets %>% 
+                               select(`_id`, `_source.text`, `_source.created_at`), # and only keep a few variables)
+                             doc_id = join_by(doc_id == `_id`),
+                             n = print_unclassified_docs,
+                             mode = "print")
 }
 
 
