@@ -20,6 +20,8 @@ source("get_rwr_terms.R")
 
 source("utils_text_processing.R")
 
+dir <- "init_classification"
+
 cat("\n ======= Preparations ======= \n")
 
 walk_replies = FALSE # should replies be considered for the random walks?
@@ -111,6 +113,11 @@ gc()
 
 cat("\n ======= Make Networks for Random Walks ======= \n")
 
+
+if (!dir.exists(file.path(dir, "walk_network_data"))) {
+  dir.create(file.path(dir, "walk_network_data"))
+}
+
 #plan(sequential) # no multisession - seems unstable for certain processes here, such as making the networks [we can rather use a simple iwalk here than changing the plan]
 
 dat_list %>% 
@@ -124,7 +131,7 @@ dat_list %>%
                                 keep_multiplex_network = T,
                                 keep_adjacency_matrix = F,
                                 keep_normalized_adjacency_matrix = T) %>% 
-            saveRDS(file = paste0("init_classification/walk_network_data/",
+            saveRDS(file = paste0(dir, "/walk_network_data/",
                                   name, ".RDS"))},
                .progress = F)
 

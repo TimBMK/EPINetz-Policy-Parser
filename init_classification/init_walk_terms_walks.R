@@ -30,6 +30,7 @@ if (installr::is.RStudio()){
   # multicore for scripts / non-rstudio processes
 }
 
+dir <- "init_classification"
 
 # settings
 
@@ -84,7 +85,7 @@ seeds <- rbindlist(list(seed_terms_ministries, # bind seed terms of subsets toge
 cat("\n ======= Compute Random Walks ======= \n")
 
 
-walk_networks_list <- list.files("init_classification/walk_network_data/")
+walk_networks_list <- list.files(file.path(dir, "walk_network_data"))
 # walk_networks_list <- walk_networks_list[150:155] # testing
 
 walk_networks_list %>% 
@@ -93,7 +94,7 @@ walk_networks_list %>%
                 
                 if(report_quantiles) {cat(paste0("\n\n", network_name, "\n"))} # report time period (name of the network) if quantiles are reported
                 
-                readRDS(file.path("init_classification/walk_network_data", walk_network)) %>% 
+                readRDS(file.path(dir, "walk_network_data", walk_network)) %>% 
                   get_rwr_terms(network_name = network_name,
                                 seeds = seeds,
                                 seed_var = "feature",
@@ -114,7 +115,7 @@ walk_networks_list %>%
                                 progress = F) %>% 
                   # write results to disk rather than saving them in the environmen
                   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
-                  vroom_write(file = paste0("init_classification/walk_terms/",
+                  vroom_write(file = paste0(dir, "/walk_terms/",
                                             network_name, ".csv"), append = F)
                 
                 
@@ -124,10 +125,10 @@ walk_networks_list %>%
   
 gc()
 
-walk_terms <- lapply(list.files("init_classification/walk_terms/", 
+walk_terms <- lapply(list.files(file.path(dir, "walk_terms"), 
                                 full.names = T), vroom) %>% rbindlist()
 
 walk_terms %>% mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
-  vroom_write(file = "init_classification/init_walk_terms.csv.tar.gz", delim = ",")
+  vroom_write(file = file.path(dir, "init_walk_terms.csv.tar.gz"), delim = ",")
 
 plan(sequential)
