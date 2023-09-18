@@ -30,6 +30,8 @@ if (installr::is.RStudio()){
   # multicore for scripts / non-rstudio processes
 }
 
+options(future.globals.maxSize = (20000*1024^2)) # 2 gb Max Size for Parallelization Processes
+
 dir <- "news_classification"
 
 recalculate_all = FALSE # should walk terms already in the walk_terms directory be recalulcalated? Setting it to FALSE is helpful if only a number of as-of-yet unclaculated walks should be computed

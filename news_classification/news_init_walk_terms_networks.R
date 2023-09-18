@@ -22,6 +22,8 @@ source("utils_text_processing.R")
 
 dir <- "news_classification"
 
+recalculate_all = FALSE # should walk networks already in the walk_network_data directory be recalulcalated? Setting it to FALSE is helpful if only a number of as-of-yet unclaculated networks should be computed
+
 cat("\n ======= Preparations ======= \n")
 
 time_frame_walks = weeks(12) # length of the time frame for random walks
@@ -85,11 +87,24 @@ gc()
 #                            verbose = F),
 #              .progress = T)
 
+if (!recalculate_all) { # drop timeframes from the list where networks were already calculated 
+  dat_list <-
+    dat_list[!(names(dat_list) %in% 
+                           str_remove(list.files(file.path(dir, "walk_network_data")), 
+                                      ".RDS"))]
+}
+
+
+cat("\n ====== Remove unneeded Objects =======  \n")
+
+rm(walk_NE)
+
+gc()
+
+
 cat("\n ======= Drop 10% Quantiles ======= \n")
 
 for (i in 1:length(dat_list)){ # somehow this is faster and more stable than mapping the function
-  
-  # print(i)
   
   dat_list[[i]] <-  drop_quantile(dat_list[[i]],
                 tokens = "lemma",
@@ -99,14 +114,6 @@ for (i in 1:length(dat_list)){ # somehow this is faster and more stable than map
                 verbose = F)
   
 }
-
-
-
-cat("\n ====== Remove unneeded Objects =======  \n")
-
-rm(walk_NE)
-
-gc()
 
 
 # Prepare Network for Random Walks
