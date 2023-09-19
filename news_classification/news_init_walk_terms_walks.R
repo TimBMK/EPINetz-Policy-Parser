@@ -30,7 +30,11 @@ if (installr::is.RStudio()){
   # multicore for scripts / non-rstudio processes
 }
 
-dir <- "init_classification"
+options(future.globals.maxSize = (20000*1024^2)) # 2 gb Max Size for Parallelization Processes
+
+dir <- "news_classification"
+
+recalculate_all = FALSE # should walk terms already in the walk_terms directory be recalulcalated? Setting it to FALSE is helpful if only a number of as-of-yet unclaculated walks should be computed
 
 # settings
 
@@ -84,9 +88,15 @@ seeds <- rbindlist(list(seed_terms_ministries, # bind seed terms of subsets toge
 
 cat("\n ======= Compute Random Walks ======= \n")
 
-
 walk_networks_list <- list.files(file.path(dir, "walk_network_data"))
 # walk_networks_list <- walk_networks_list[150:155] # testing
+
+if (!recalculate_all) { # drop timeframes where walk_terms were already calculated from the list
+  walk_networks_list <-
+    walk_networks_list[!(str_remove(walk_networks_list, ".RDS") %in% 
+                           str_remove(list.files(file.path(dir, "walk_terms")), 
+                                      ".csv"))]
+}
 
 walk_networks_list %>% 
   future_walk(\(walk_network) 

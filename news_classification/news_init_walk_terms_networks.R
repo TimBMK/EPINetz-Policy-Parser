@@ -20,35 +20,41 @@ source("get_rwr_terms.R")
 
 source("utils_text_processing.R")
 
-dir <- "init_classification"
+dir <- "news_classification"
+
+recalculate_all = FALSE # should walk networks already in the walk_network_data directory be recalulcalated? Setting it to FALSE is helpful if only a number of as-of-yet unclaculated networks should be computed
 
 cat("\n ======= Preparations ======= \n")
-
-walk_replies = FALSE # should replies be considered for the random walks?
-
-walk_mentions = TRUE # should @-mentions be used for the random walks?
-
-walk_urls = TRUE # should URLs be used for the random walks?
 
 time_frame_walks = weeks(12) # length of the time frame for random walks
 
 # read data
 
-tokens <- get_latest_tokens_file(path = "Tokenizer", pattern = "tokens_full.csv.tar.gz") %>% 
-  vroom(col_types = list(doc_id = "c", `_source.author_id` = "c")) 
+tokens <- vroom(list.files(dir, pattern = "tokens_news", full.names = T))
 
+news_data <- vroom("news_classification/data_news_2019-2021.csv.tar.gz")
+# tokens <- vroom("news_classification/tokens_news_2021.csv.tar.gz")
 
 ## NEs only
 walk_NE <- filter_tokens(tokens,
                          tokens_col = "lemma", 
                          tags = c("NN", "NE"), # Noun words and NEs only
                          #minimum string length, stopwords dictionaries, additional stopwords and lower casing set to default
-                         replies = walk_replies, # filter for reply condition (TRUE includes replies, FALSE does not)  
-                         keep_mentions = walk_mentions, # should @-mentions be kept?
-                         keep_urls = walk_urls # should URLs be kept?
+                         replies = NULL, # filter for reply condition (TRUE includes replies, FALSE does not)  
+                         keep_mentions = NULL, # should @-mentions be kept?
+                         keep_urls = NULL # should URLs be kept?
 ) %>% 
-  mutate(week = ceiling_date(as_datetime(`_source.created_at`), # make week indicator (last day of the week)
+  left_join(news_data %>% select(`_id`, `_source.estimated_date`), by = join_by(doc_id == `_id`)) %>% # add date indicator
+  mutate(week = ceiling_date(as_datetime(`_source.estimated_date`), # make week indicator (last day of the week)
                              unit = "week"))
+
+gc()
+
+# Housekeeping #
+cat("\n ====== Remove unneeded Objects =======  \n")
+
+rm(tokens)
+rm(news_data)
 
 gc()
 
@@ -81,11 +87,24 @@ gc()
 #                            verbose = F),
 #              .progress = T)
 
+if (!recalculate_all) { # drop timeframes from the list where networks were already calculated 
+  dat_list <-
+    dat_list[!(names(dat_list) %in% 
+                           str_remove(list.files(file.path(dir, "walk_network_data")), 
+                                      ".RDS"))]
+}
+
+
+cat("\n ====== Remove unneeded Objects =======  \n")
+
+rm(walk_NE)
+
+gc()
+
+
 cat("\n ======= Drop 10% Quantiles ======= \n")
 
 for (i in 1:length(dat_list)){ # somehow this is faster and more stable than mapping the function
-  
-  # print(i)
   
   dat_list[[i]] <-  drop_quantile(dat_list[[i]],
                 tokens = "lemma",
@@ -96,29 +115,16 @@ for (i in 1:length(dat_list)){ # somehow this is faster and more stable than map
   
 }
 
-gc()
-
-# walk_NE <- walk_NE %>% mutate(lemma = case_when(!str_detect(lemma, "http") ~ tolower(lemma), # convert to lower,
-#                                                 .default = lemma)) # but preserve URLs as is (to not break twitter links)
-
-
-# Housekeeping #
-cat("\n ====== Remove unneeded Objects =======  \n")
-
-rm(tokens)
-
-gc()
 
 # Prepare Network for Random Walks
 
 cat("\n ======= Make Networks for Random Walks ======= \n")
 
+#plan(sequential) # no multisession - seems unstable for certain processes here, such as making the networks [we can rather use a simple iwalk here than changing the plan]
 
 if (!dir.exists(file.path(dir, "walk_network_data"))) {
   dir.create(file.path(dir, "walk_network_data"))
 }
-
-#plan(sequential) # no multisession - seems unstable for certain processes here, such as making the networks [we can rather use a simple iwalk here than changing the plan]
 
 dat_list %>% 
   iwalk(\(dat, name) # saving the results as .RDS to read in later is more stable than keeping them in the environment
