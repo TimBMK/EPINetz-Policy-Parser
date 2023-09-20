@@ -49,6 +49,6 @@ vroom::vroom_write(result, delim = ",", pipe("pigz > news_classification/data/da
 
 q <- "estimated_date:[\"2022-01-01 00:00:00\" TO \"2023-06-22 00:00:00\"]" 
 
-result <- full_scroll(conn, q = q, index = "german_news")
+result <- full_scroll(conn, q = q, index = "news_articles_epinetz") # a new index is in place since 2022
 
 vroom::vroom_write(result, delim = ",", pipe("pigz > news_classification/data/data_news_2022-2023.csv.tar.gz"))
