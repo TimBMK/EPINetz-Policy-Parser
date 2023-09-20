@@ -45,6 +45,7 @@ news_data <- data_files %>%
 
 names(news_data) <- str_extract(data_files, "[\\d-]+") # name the dataframes in the list
 
+cat(paste("\nFound data", names(news_data), "to tokenize.\n"))
 
 # Tokenization, Lemmatization, Noun-Word Filtering
 
@@ -53,19 +54,23 @@ cat("\nRunning Mapped Spacy....\n")
 
 spacy_initialize(model = "de_core_news_lg") # start python spacy
 
-iwalk(\(data, name)
-    {corpus(data, docid_field = "_id", text_field = "_source.text", 
-                      unique_docnames = T) %>% 
-        spacy_parse(corpus,
-                           pos = T,
-                           tag = T,
-                           lemma = T,
-                           entity = T
-      ) %>% 
-        mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
-        vroom_write(file = paste0("news_classification/tokens_news_", name,".csv.tar.gz"), delim = ",")
-      
-})
+news_data %>% 
+  iwalk(\(data, name)
+        {
+          data %>% 
+            corpus(docid_field = "id", text_field = "body", 
+                   unique_docnames = T) %>% 
+            spacy_parse(corpus,
+                        pos = T,
+                        tag = T,
+                        lemma = T,
+                        entity = T,
+                        nounphrase = T,
+                        additional_attributes = c("like_url", "like_num", "is_currency")
+            ) %>% 
+            mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% 
+            vroom_write(file = paste0("news_classification/tokens_news_", name,".csv.tar.gz"), delim = ",")
+  })
 
 
 cat("\nTokenization complete. Finalizing spacy...\n")
