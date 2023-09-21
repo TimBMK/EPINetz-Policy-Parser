@@ -60,8 +60,7 @@ news_data %>%
           data %>% 
             corpus(docid_field = "id", text_field = "body", 
                    unique_docnames = T) %>% 
-            spacy_parse(corpus,
-                        pos = T,
+            spacy_parse(pos = T,
                         tag = T,
                         lemma = T,
                         entity = T,
