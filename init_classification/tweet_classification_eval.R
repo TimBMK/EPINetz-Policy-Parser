@@ -37,7 +37,7 @@ classification_urls = TRUE # should urls be utilized? adviced to keep this in li
 
 classification_measure = "ScoreNormMean" # one of ScoreNorm, ScoreNormMean, ScoreNormGroup, ScoreNormGroupMean, or (for raw scores) Score or ScoreMean
 
-cutoff = NULL # Should an additional cutoff be set? Applies to classification measure. NULL to skip
+classification_cutoff = NULL # Should an additional cutoff be set? Applies to classification measure. NULL to skip
 
 seedterm_value = NULL # Should Seed Term Scores values be set to a fixed value for classification? NULL to skip. Otherwise enter a numerical value. Applies to classification_measure only
 
@@ -48,7 +48,13 @@ cut_frequent_policy_terms = NULL  # Should terms appearing in numerous policy fi
                                   #  numeric value for a specific number
                                   #  NULL to skip
 
-cut_lower_quantile_fields = 0.04 # Should policy classifications within a document be cut if they fall below a certain quantile? NULL to skip. Else numerical value to specify the quantile
+cutoff_value = 0.1 # a numerical value to set. Scores below will be set to 0. NULL to skip
+
+cutoff_quantile = TRUE # if TRUE, the cutoff_value specifies a quantile, rather than a fixed value
+
+cutoff_normalized_scores = TRUE # if TRUE, the cutoff is applied to the normalized scores. Otherwise, normalization is applied after the cutoff
+
+minimum_results = NULL # Numerical minimum number of results for each group to be returned. Bypasses the cutoff_value as needed. NULL to skip
 
 normalize_scores = "group" # should the score in the documents be normalized between 0 and 1? Can be "doc" (normalize within each document), "group" (normalize for each group), or NULL to skip
 
@@ -105,11 +111,14 @@ classified_documents <- classify_documents(
   tokens_var = "lemma", # name of the tokens variable within the documents dataframe. Usually "tokens", "lemma", etc.
   doc_id = "doc_id", # name of the doc_id variable in document_tokens
   classification_measure = classification_measure, # set the measure to use for classification here. Must be present in the data
-  cutoff = cutoff, # Should a cutoff be set to filter the walk_terms?? Applies to classification measure. NULL to skip. This is useful if a more strict cutoff is desired than in get_rwr_terms()
+  classification_cutoff = classification_cutoff, # Should a cutoff be set to filter the walk_terms?? Applies to classification measure. NULL to skip. This is useful if a more strict cutoff is desired than in get_rwr_terms()
   keep_seed_terms = keep_seed_terms, # should seed terms be kept even if their score is lower than the cutoff? only applies if a cutoff is specified
   seedterm_value = seedterm_value, # Should Seed Term Scores values be set to a fixed value for classification? NULL to skip. Otherwise enter a numerical value. Applies to classification_measure only
   normalize_scores = normalize_scores, # should the score in the documents be normalized between 0 and 1? Can be doc (normalize within each document), group (normalize for each group), or NULL to skip
-  cut_lower_quantile_fields = cut_lower_quantile_fields, # Should policy classifications within a document be cut if they fall below a certain quantile? NULL to skip. Else numerical value to specify the quantile
+  cutoff_value = cutoff_value, # a numerical value to set. Scores below will be set to 0. NULL to skip
+  cutoff_quantile = cutoff_quantile, # if TRUE, the cutoff_value specifies a quantile, rather than a fixed value
+  cutoff_normalized_scores = cutoff_normalized_scores, # if TRUE, the cutoff is applied to the normalized scores. Otherwise, normalization is applied after the cutoff
+  minimum_results = minimum_results, # Numerical minimum number of results for each group to be returned. Bypasses the cutoff_value as needed. NULL to skip    
   cut_frequent_group_terms = cut_frequent_policy_terms,
   return_walk_terms = return_walk_terms, # should the processed walk terms be returned for further analysis and transparency?
   return_unclassified_docs = return_unclassified_docs, # should the IDs of the unlassified docs be returned? 

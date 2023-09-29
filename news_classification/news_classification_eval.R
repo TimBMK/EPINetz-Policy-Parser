@@ -35,7 +35,7 @@ classification_before_after = "before" # set if the classification_timeframe is 
 
 classification_measure = "ScoreNormMean" # one of ScoreNorm, ScoreNormMean, ScoreNormGroup, ScoreNormGroupMean, or (for raw scores) Score or ScoreMean
 
-cutoff = NULL # Should an additional cutoff be set? Applies to classification measure. NULL to skip
+classification_cutoff = NULL # Should an additional cutoff be set? Applies to classification measure. NULL to skip
 
 seedterm_value = NULL # Should Seed Term Scores values be set to a fixed value for classification? NULL to skip. Otherwise enter a numerical value. Applies to classification_measure only
 
@@ -46,7 +46,13 @@ cut_frequent_policy_terms = NULL  # Should terms appearing in numerous policy fi
                                   #  numeric value for a specific number
                                   #  NULL to skip
 
-cut_lower_quantile_fields = 0.04 # Should policy classifications within a document be cut if they fall below a certain quantile? NULL to skip. Else numerical value to specify the quantile
+cutoff_value = 0.5 # a numerical value to set. Scores below will be set to 0. NULL to skip
+
+cutoff_quantile = FALSE # if TRUE, the cutoff_value specifies a quantile, rather than a fixed value
+
+cutoff_normalized_scores = TRUE # if TRUE, the cutoff is applied to the normalized scores. Otherwise, normalization is applied after the cutoff
+
+minimum_results = 50 # Numerical minimum number of results for each group to be returned. Bypasses the cutoff_value as needed. NULL to skip
 
 normalize_scores = "doc" # should the score in the documents be normalized between 0 and 1? Can be "doc" (normalize within each document), "group" (normalize for each group), or NULL to skip
       # normalizing the scores per document seems beneficial for longer docs, "group" is better suited for short documents like tweets
@@ -64,7 +70,7 @@ return_unclassified_docs = TRUE # should the IDs of the unlassified docs be retu
 
 walk_terms <- vroom(paste0(dir, "/walk_terms/", rwr_timeframe, ".csv"))
 
-news_docs <- read_timelimited_data(file = file.path(dir, "data_news_2019-2021.csv.tar.gz"),
+news_docs <- read_timelimited_data(file = file.path(dir, "data/data_news_2019-2021.csv.tar.gz"),
                                    guess_max = 10000,
                                    filter_var = "_source.estimated_date",
                                    starting_point = rwr_timeframe,
@@ -98,15 +104,18 @@ classification_result <- classify_documents(
   tokens_var = "lemma", # name of the tokens variable within the documents dataframe. Usually "tokens", "lemma", etc.
   doc_id = "doc_id", # name of the doc_id variable in document_tokens
   classification_measure = classification_measure, # set the measure to use for classification here. Must be present in the data
-  cutoff = cutoff, # Should a cutoff be set to filter the walk_terms?? Applies to classification measure. NULL to skip. This is useful if a more strict cutoff is desired than in get_rwr_terms()
+  classification_cutoff = classification_cutoff, # Should a cutoff be set to filter the walk_terms?? Applies to classification measure. NULL to skip. This is useful if a more strict cutoff is desired than in get_rwr_terms()
   keep_seed_terms = keep_seed_terms, # should seed terms be kept even if their score is lower than the cutoff? only applies if a cutoff is specified
   seedterm_value = seedterm_value, # Should Seed Term Scores values be set to a fixed value for classification? NULL to skip. Otherwise enter a numerical value. Applies to classification_measure only
   normalize_scores = normalize_scores, # should the score in the documents be normalized between 0 and 1? Can be doc (normalize within each document), group (normalize for each group), or NULL to skip
-  cut_lower_quantile_fields = cut_lower_quantile_fields, # Should policy classifications within a document be cut if they fall below a certain quantile? NULL to skip. Else numerical value to specify the quantile
+  cutoff_value = cutoff_value, # a numerical value to set. Scores below will be set to 0. NULL to skip
+  cutoff_quantile = cutoff_quantile, # if TRUE, the cutoff_value specifies a quantile, rather than a fixed value
+  cutoff_normalized_scores = cutoff_normalized_scores, # if TRUE, the cutoff is applied to the normalized scores. Otherwise, normalization is applied after the cutoff
+  minimum_results = minimum_results, # Numerical minimum number of results for each group to be returned. Bypasses the cutoff_value as needed. NULL to skip  
   cut_frequent_group_terms = cut_frequent_policy_terms,
   return_walk_terms = return_walk_terms, # should the processed walk terms be returned for further analysis and transparency?
   return_unclassified_docs = return_unclassified_docs, # should the IDs of the unlassified docs be returned? 
-  # setting return_walk_terms or return_unclassified_docs to TURE returns a list of dataframes rather than a single dataframe
+  # setting return_walk_terms or return_unclassified_docs to TRUE returns a list of dataframes rather than a single dataframe
   verbose = TRUE
   )
 
@@ -130,3 +139,11 @@ top_docs <- top_group_documents(classification_result,
                                 n = 20, # set number of documents to return here
                                 with_ties = TRUE, # should all results with the same score be kept if there is a tie?
                                 mode = "return") # should the results merely be printed (print) or returned as a data object (return)?
+
+unclassified_docs <- get_unclassified_documents( 
+  classification_result, # the result of classify_documents(). requires the walk_terms data
+  documents = news_docs, # the full document data to be matched to the classification result for printout
+  doc_id = join_by(doc_id == `_id`), # the name of the doc_id used for matching. Can be a join_by() function where classification_result = a and documents = b
+  n = 20, # the number of documents to print/return 
+  mode = "return" # should the results be printed out a dataframe of results be returned?
+) 

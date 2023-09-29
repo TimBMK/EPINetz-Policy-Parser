@@ -7,18 +7,21 @@ classify_documents <- function( # the working horse function to classify documen
     classification_measure = c("Score", "ScoreMean", # set the measure to use for classification here. Must be present in the data
                                "ScoreNorm", "ScoreNormMean", 
                                "ScoreNormGroup", "ScoreNormGroupMean"), 
-    cutoff = NULL, # Should a cutoff be set to filter the walk_terms?? Applies to classification measure. NULL to skip. This is useful if a more strict cutoff is desired than in get_rwr_terms()
+    classification_cutoff = NULL, # Should a cutoff be set to filter the walk_terms?? Applies to classification measure. NULL to skip. This is useful if a more strict cutoff is desired than in get_rwr_terms()
     keep_seed_terms = TRUE, # should seed terms be kept even if their score is lower than the cutoff? only applies if a cutoff is specified
     seedterm_value = NULL, # Should Seed Term Scores values be set to a fixed value for classification? NULL to skip. Otherwise enter a numerical value. Applies to classification_measure only
     normalize_scores = c("doc", "group", NULL), # should the score in the documents be normalized between 0 and 1? Can be doc (normalize within each document), group (normalize for each group), or NULL to skip
-    cut_lower_quantile_fields = NULL, # Should policy classifications within a document be set to 0 if they fall below a certain quantile? NULL to skip. Else numerical value to specify the quantile
+    cutoff_value = NULL, # a numerical value to set. Scores below will be set to 0. NULL to skip
+    cutoff_quantile = FALSE, # if TRUE, the cutoff_value specifies a quantile, rather than a fixed value
+    cutoff_normalized_scores = FALSE, # if TRUE, the cutoff is applied to the normalized scores. Otherwise, normalization is applied after the cutoff
+    minimum_results = NULL, # Numerical minimum number of results for each group to be returned. Bypasses the cutoff_value as needed. NULL to skip
     cut_frequent_group_terms = c(NULL, numeric(), "auto"),  # Should terms appearing in numerous groups be cut? 
-                                      #  "auto" to cut terms appearing in more than 50% of the policy fields
+                                      #  "auto" to cut terms appearing in more than 50% of the groups
                                       #  numeric value for a specific number
                                       #  NULL to skip
     return_walk_terms = TRUE, # should the processed walk terms be returned for further analysis and transparency?
     return_unclassified_docs = TRUE, # should the IDs of the unlassified docs be returned? 
-              # setting return_walk_terms or return_unclassified_docs to TURE returns a list of dataframes rather than a single dataframe
+              # setting return_walk_terms or return_unclassified_docs to TRUE returns a list of dataframes rather than a single dataframe
     verbose = TRUE # should the number of unclassified documents be reported?
     ){
   
@@ -59,9 +62,9 @@ classify_documents <- function( # the working horse function to classify documen
   ## Data Prep
   
   ### apply cutoff
-  if (!is.null(cutoff)) {
+  if (!is.null(classification_cutoff)) {
     walk_terms <-
-      walk_terms %>% dplyr::filter(!!as.name(classification_measure) >= cutoff |
+      walk_terms %>% dplyr::filter(!!as.name(classification_measure) >= classification_cutoff |
                                      seed_term == TRUE)
   }
   
@@ -107,8 +110,7 @@ classify_documents <- function( # the working horse function to classify documen
       )
   }
   
-  
-  # cut frequent policy terms
+  ## cut frequent policy terms
   if (!is.null(cut_frequent_group_terms)) {
     if (cut_frequent_group_terms == "auto") {
       classification_terms <- classification_terms %>% 
@@ -129,29 +131,67 @@ classify_documents <- function( # the working horse function to classify documen
     }
   }
   
+  
   ## classify
   
   classified_documents <- classification_terms %>%
     dplyr::summarize(score = sum(!!as.name(classification_measure)),
                      .by = c(!!as.name(doc_id), !!as.name(group_name))) %>% # sum policy scores by field and document
     tidyr::complete(!!as.name(doc_id),!!as.name(group_name),
-                    fill = list(score = 0)) 
+                    fill = list(score = 0))
   
   
-  
-  if (!is.null(cut_lower_quantile_fields)) { # set scores to 0 for lower quantiles
+  ### apply cutoff before normalization
+  if (!cutoff_normalized_scores & !is.null(cutoff_value)) { # set scores to 0 for lower quantiles
     
-    quantile <- stats::quantile(classified_documents$score, 
-                                cut_lower_quantile_fields)[[1]]
-    classified_documents <- classified_documents %>% 
-      dplyr::mutate(score = dplyr::case_when(score < quantile ~ 0,
-                                             .default = score))
-    
-    if (verbose) {
-      cat(paste0("Setting score-values below ",
-                 quantile, " (", cut_lower_quantile_fields, 
-                 " quantile) to 0. This step is applied before normalization.\n"))
+    if (!is.null(minimum_results)) { # preserve original values for the minimum results
+      top_values <- classified_documents %>% 
+        dplyr::slice_max(score, n = minimum_results, 
+                         by = !!as.name(group_name)) %>% 
+        dplyr::rename(top_value = score) %>% 
+        dplyr::select({{doc_id}}, {{group_name}}, top_value)
     }
+    
+    if (cutoff_quantile) {
+      
+      quantile <- stats::quantile(classified_documents$score, 
+                                  cutoff_value)[[1]]
+      classified_documents <- classified_documents %>% 
+        dplyr::mutate(score = dplyr::case_when(score < quantile ~ 0,
+                                               .default = score))
+      
+      if (verbose) {
+        cat(paste0("Setting score-values below ",
+                   quantile, " (", cutoff_value, 
+                   " quantile) to 0. This step is applied before normalization.\n"))
+      }
+    } else {
+      classified_documents <- classified_documents %>% 
+        dplyr::mutate(score = dplyr::case_when(score < cutoff_value ~ 0,
+                                               .default = score))
+      if (verbose) {
+        cat(paste("Setting score-values below",
+                  cutoff_value, 
+                  "to 0. This step is applied before normalization.\n"))
+      }
+    }
+    
+    if (!is.null(minimum_results)) {
+      classified_documents <- classified_documents %>% 
+        dplyr::left_join(top_values, by = c(doc_id, group_name)) %>% 
+        dplyr::mutate(top_value = dplyr::case_when( # replace NAs from matching with 0s
+          is.na(top_value) ~ 0, .default = top_value)) %>% 
+        dplyr::mutate(score = dplyr::case_when( # and replace 0 values with top values where the number of scores > 0 is below the minimum
+          sum(score > 0) < minimum_results ~ top_value, 
+          .default = score), .by = !!as.name(group_name)) %>% 
+        dplyr::select(!top_value)
+      
+      if (verbose) {
+        cat(paste("A minimum of", minimum_results, "results per", group_name,
+                  "is returned. This may overwrite the cutoff_value.\n"))
+      }
+    }
+    
   }
   
   if (!is.null(normalize_scores)) {
@@ -172,15 +212,70 @@ classify_documents <- function( # the working horse function to classify documen
         )
     }
     
-    # set the normalized score 0 to when the score is 0. This prevents documents with 0 in all groups to show as 0.5 in the score_norm
+    ### set the normalized score 0 to when the score is 0. This prevents documents with 0 in all groups to show as 0.5 in the score_norm
     classified_documents <- classified_documents %>% 
       dplyr::mutate(score_norm = dplyr::case_when(score == 0 ~ 0,
                                     .default = score_norm))
   }
-
-
   
-  # report unclassified documents
+  ### apply cutoff after normalization
+  if (cutoff_normalized_scores & !is.null(cutoff_value)) { # set scores to 0 for lower quantiles
+    
+    if (!is.null(minimum_results)) { # preserve original values for the minimum results
+      top_values <- classified_documents %>% 
+        dplyr::slice_max(score_norm, n = minimum_results, 
+                         by = !!as.name(group_name)) %>% 
+        dplyr::rename(top_value = score_norm) %>% 
+        dplyr::select({{doc_id}}, {{group_name}}, top_value)
+    }
+    
+    if (cutoff_quantile){
+      
+      quantile <- stats::quantile(classified_documents$score_norm, 
+                                  cutoff_value)[[1]]
+      classified_documents <- classified_documents %>% 
+        dplyr::mutate(score_norm = dplyr::case_when(score_norm < quantile ~ 0,
+                                                    .default = score_norm))
+      
+      if (verbose) {
+        cat(paste0("Setting normalized score-values below ",
+                   quantile, " (", cutoff_value, 
+                   " quantile) to 0. Non-normalized scores are set to 0 in accordance.\n"))
+      }
+    } else {
+      classified_documents <- classified_documents %>% 
+        dplyr::mutate(score_norm = dplyr::case_when(score_norm < cutoff_value ~ 0,
+                                                    .default = score_norm))
+      if (verbose) {
+        cat(paste("Setting normalized score-values below",
+                  cutoff_value, 
+                  "to 0. Non-normalized scores are set to 0 in accordance.\n"))
+      }
+    }
+    
+    ### set non-normalized score to 0 where score_norm is 0
+    classified_documents <- classified_documents %>% 
+      dplyr::mutate(score = case_when(score_norm == 0 ~ 0, .default = score))
+    
+    if (!is.null(minimum_results)) {
+      classified_documents <- classified_documents %>% 
+        dplyr::left_join(top_values, by = c(doc_id, group_name)) %>% 
+        dplyr::mutate(top_value = dplyr::case_when( # replace NAs from matching with 0s
+          is.na(top_value) ~ 0, .default = top_value)) %>% 
+        dplyr::mutate(score_norm = dplyr::case_when( # and replace 0 values with top values where the number of scores > 0 is below the minimum
+          sum(score_norm > 0) < minimum_results ~ top_value, 
+          .default = score_norm), .by = !!as.name(group_name)) %>% 
+        dplyr::select(!top_value)
+      
+      if (verbose) {
+        cat(paste("A minimum of", minimum_results, "results per", group_name,
+                  "is returned. This may overwrite the cutoff_value.\n"))
+      }
+    }
+    
+  }
+  
+  ## report unclassified documents
   if (verbose | return_unclassified_docs) {
     unclassified_documents <- document_tokens %>% 
       dplyr::anti_join(classified_documents, 
@@ -194,12 +289,13 @@ classify_documents <- function( # the working horse function to classify documen
                 "out of",
                 total,
                 "documents could not be classified", 
-                paste0("(", scales::percent(unclassified/total), ")"),
+                paste0("(", scales::percent(unclassified/total, 
+                                            accuracy = 0.01), ")"),
                 "\n"))
     }
   }
   
-  # return the result
+  ## return the result
   if (return_walk_terms | return_unclassified_docs) {
     
     out <- list()
