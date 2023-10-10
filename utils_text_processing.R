@@ -203,33 +203,128 @@ get_latest_tokens_file <- function(path,
 }
 
 
-read_timelimited_data <- function(file,
+read_timelimited_data <- function(file, # this can handle multiple files, and will pick only the relevant files (if applicable)
                                   ..., # arguments to pass to vroom()
                                   filter_var = "_source.created_at", # filtering var as datetime 
                                   starting_point, # the starting point, as "YYYY-MM-DD"
                                   timeframe = lubridate::weeks(1), # the timeframe before or after the starting point, as a lubridate period
-                                  before_after = c("before", "after")) {
+                                  before_after = c("before", "after"),
+                                  verbose = TRUE # verbosity of warnings
+) {
   require(rlang)
   require(dplyr)
   require(lubridate)
   require(vroom)
+  require(purrr)
+  require(data.table)
+  require(stringr)
   
   rlang::arg_match(before_after)
   
+  starting_point <- lubridate::ymd(starting_point) # make sure it's a date format
+  
+  if (length(file) > 1) {
+    
+    data <- file %>% 
+      purrr::map(\(dat)
+                 { 
+                   years <- dat %>% stringr::str_extract_all("\\d{4}") %>% .[[1]] # get years in file name
+                   
+                   if (length(years) == 0) { # if no years in filename, load regardless and give warning
+                     if (verbose) {
+                       warning(paste0("No year indicators found in ", dat,
+                                      ". Loading the dataset regardless of necessity."))
+                     }
+                     loaded_data <- vroom::vroom(dat, ...)
+                   }
+                   
+                   if (length(years) == 1) { # for one year in a filename, check if the interval matches the specified timefram
+                     if (before_after == "before") {
+                       if (lubridate::parse_date_time(years[1], # data in the interval of the timeframe?
+                                                      orders = "y") %within% lubridate::interval(
+                                                        starting_point - timeframe,
+                                                        starting_point) 
+                       ) { 
+                         loaded_data <- vroom::vroom(dat, ...) 
+                       }
+                     }
+                     
+                     if (before_after == "after") {
+                       if (lubridate::parse_date_time(years[1], # data in the interval of the timeframe?
+                                                      orders = "y") %within% lubridate::interval(
+                                                        starting_point, 
+                                                        starting_point + timeframe)
+                       ) { 
+                         loaded_data <- vroom::vroom(dat, ...) 
+                       }
+                     }
+                   }
+                   
+                   
+                   if (length(years) == 2) { # for two years in a filename, check if the interval matches the specified timeframe
+                     interval <-
+                       lubridate::interval(
+                         lubridate::parse_date_time(years[1],
+                                                    orders = "y"),
+                         lubridate::parse_date_time(years[2],
+                                                    orders = "y")
+                       )
+                     
+                     if (before_after == "before") {
+                       if (lubridate::interval(starting_point - timeframe, 
+                                               starting_point) %within% interval) { # period in the interval of the data?
+                         loaded_data <- vroom::vroom(dat, ...) 
+                       }
+                     }
+                     
+                     if (before_after == "after") {
+                       if (lubridate::interval(starting_point, 
+                                               starting_point + timeframe) %within% interval) { # period in the interval of the data?
+                         loaded_data <- vroom::vroom(dat, ...) 
+                       }
+                     }
+                   } 
+                   
+                   
+                   if (length(years) > 2) { # for more than two years in filename, load regardless and give warning
+                     if (verbose) {
+                       warning(paste0("More than two year indicators found in ", dat,
+                                      ". Loading the dataset regardless of necessity."))
+                     }
+                     loaded_data <- vroom::vroom(dat, ...)
+                   }
+                  
+                   
+                   if (exists("loaded_data")){ # return the loaded data only if it was loaded
+                     return(loaded_data)
+                   }
+                   
+      }) %>% purrr::compact() %>% # drops empty list elements for cases where no data was loaded
+      data.table::rbindlist(fill = TRUE) 
+    
+    
+    
+  }  else {
+    data <- vroom::vroom(file, ...) 
+  }
+  
   if (before_after == "before") {
-    data <- vroom::vroom(file, ...) %>%
-      dplyr::filter(!!as.name(filter_var) <= lubridate::ymd(starting_point) &
-                      !!as.name(filter_var) >= (lubridate::ymd(starting_point) - timeframe))}
+    result <- data %>%
+      dplyr::filter(!!as.name(filter_var) <= starting_point &
+                      !!as.name(filter_var) >= (starting_point - timeframe))}
   
   if (before_after == "after") {
-    data <- vroom::vroom(file, ...) %>% 
-      dplyr::filter(!!as.name(filter_var) >= lubridate::ymd(starting_point) &
-                      !!as.name(filter_var) <= (lubridate::ymd(starting_point) + timeframe))}
+    result <- data %>% 
+      dplyr::filter(!!as.name(filter_var) >= starting_point &
+                      !!as.name(filter_var) <= (starting_point + timeframe))}
   
   gc(verbose = FALSE)
   
-  return(data)
+  return(result)
 }
+
+
+
 
 
 split_timeframes <- function(data, # the dataframe to read in

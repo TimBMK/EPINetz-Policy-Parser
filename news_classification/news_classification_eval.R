@@ -70,12 +70,13 @@ return_unclassified_docs = TRUE # should the IDs of the unlassified docs be retu
 
 walk_terms <- vroom(paste0(dir, "/walk_terms/", rwr_timeframe, ".csv"))
 
-news_docs <- read_timelimited_data(file = file.path(dir, "data/data_news_2019-2021.csv.tar.gz"),
-                                   guess_max = 10000,
-                                   filter_var = "_source.estimated_date",
-                                   starting_point = rwr_timeframe,
-                                   timeframe = classification_timeframe,
-                                   before_after = classification_before_after)
+news_docs <- list.files(file.path(dir, "data"), "data_news", full.names = T) %>% 
+  read_timelimited_data(show_col_types = FALSE,
+                        guess_max = 10000,
+                        filter_var = "_source.estimated_date",
+                        starting_point = rwr_timeframe,
+                        timeframe = classification_timeframe,
+                        before_after = classification_before_after)
 
 
 classification_NE <- list.files(dir, 
