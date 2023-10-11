@@ -223,7 +223,9 @@ read_timelimited_data <- function(file, # this can handle multiple files, and wi
   
   starting_point <- lubridate::ymd(starting_point) # make sure it's a date format
   
-  if (length(file) > 1) {
+  if (length(file) > 1) { 
+    # if more than one file is provided, check for each file if the data is within the specified timeframe
+    #   this is helpful for automatically loading data distributed over several files without specifiying the file each time and without loading unnecessarily large datasets
     
     data <- file %>% 
       purrr::map(\(dat)
@@ -304,10 +306,11 @@ read_timelimited_data <- function(file, # this can handle multiple files, and wi
     
     
     
-  }  else {
+  }  else { # if only one file is provided, it is loaded directly
     data <- vroom::vroom(file, ...) 
   }
   
+  # filter the timeframe within the loaded data
   if (before_after == "before") {
     result <- data %>%
       dplyr::filter(!!as.name(filter_var) <= starting_point &
