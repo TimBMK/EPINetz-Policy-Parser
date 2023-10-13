@@ -209,6 +209,9 @@ read_timelimited_data <- function(file, # this can handle multiple files, and wi
                                   starting_point, # the starting point, as "YYYY-MM-DD"
                                   timeframe = lubridate::weeks(1), # the timeframe before or after the starting point, as a lubridate period
                                   before_after = c("before", "after"),
+                                  check_timeframe = TRUE,
+                                  add_file_time = lubridate::years(1), # time to add to the filename when checking for fit of data with specified timeframe. 
+                                                                       #  E.g., when adding years(1), it is assumed the file "data_news_2017-2018" contains data from 2017-01-01 to 2019-01-01
                                   verbose = TRUE # verbosity of warnings
 ) {
   require(rlang)
@@ -223,7 +226,7 @@ read_timelimited_data <- function(file, # this can handle multiple files, and wi
   
   starting_point <- lubridate::ymd(starting_point) # make sure it's a date format
   
-  if (length(file) > 1) { 
+  if (length(file) > 1 & check_timeframe) { 
     # if more than one file is provided, check for each file if the data is within the specified timeframe
     #   this is helpful for automatically loading data distributed over several files without specifiying the file each time and without loading unnecessarily large datasets
     
@@ -269,7 +272,8 @@ read_timelimited_data <- function(file, # this can handle multiple files, and wi
                          lubridate::parse_date_time(years[1],
                                                     orders = "y"),
                          lubridate::parse_date_time(years[2],
-                                                    orders = "y")
+                                                    orders = "y") +
+                           add_file_time
                        )
                      
                      if (before_after == "before") {
@@ -304,7 +308,9 @@ read_timelimited_data <- function(file, # this can handle multiple files, and wi
       }) %>% purrr::compact() %>% # drops empty list elements for cases where no data was loaded
       data.table::rbindlist(fill = TRUE) 
     
-    
+    if (length(data) == 0) {
+      stop("No fitting data found for specified timeframe in the data. Either specify different files or timeframe or skip this check with check_timeframe == FALSE\n")
+    }
     
   }  else { # if only one file is provided, it is loaded directly
     data <- vroom::vroom(file, ...) 
