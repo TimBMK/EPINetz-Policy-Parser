@@ -28,7 +28,7 @@ if (installr::is.RStudio()){
   plan(list(tweak(multicore, workers = 2), # A nested plan, where the first level is the number of networks processed in parallel, 
             tweak(multicore, workers = 16))) # and the second level is the parallelization of the random walks 
   # multicore for scripts / non-rstudio processes
-}
+} # reduce the number of parallel processes if the walks crash (esp. for large, memory-hungry networks)
 
 options(future.globals.maxSize = (20000*1024^2)) # 2 gb Max Size for Parallelization Processes
 

@@ -76,14 +76,16 @@ news_docs <- list.files(file.path(dir, "data"), "data_news", full.names = T) %>%
                         filter_var = "_source.estimated_date",
                         starting_point = rwr_timeframe,
                         timeframe = classification_timeframe,
-                        before_after = classification_before_after)
+                        before_after = classification_before_after,
+                        check_timeframe = TRUE,
+                        add_file_time = lubridate::years(1),
+                        verbose = TRUE)
 
 
 classification_NE <- list.files(dir, 
-                                pattern = paste0("tokens_news_", 
-                                                 str_extract(rwr_timeframe, 
-                                                             "\\d+(?=-)")), # only read the required tokens object
+                                pattern = "tokens_news_", # only read the required tokens object
                                 full.names = TRUE) %>% 
+  .[str_detect(., pattern = str_extract(rwr_timeframe, "\\d+(?=-)"))] %>% 
   vroom() %>% 
   inner_join(news_docs %>% select(`_id`), by = join_by(doc_id == `_id`)) %>% # keep only the required tokens, as determined by the doc IDs in the time-filtered docs object
   filter_tokens(tokens_col = "lemma", 
@@ -92,9 +94,6 @@ classification_NE <- list.files(dir,
                 replies = NULL, # not needed
                 keep_mentions = NULL, # not needed
                 keep_urls = NULL) # not needed
-
-
-
 
 
 # Classify
