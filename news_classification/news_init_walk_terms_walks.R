@@ -30,7 +30,7 @@ if (installr::is.RStudio()){
   # multicore for scripts / non-rstudio processes
 } # reduce the number of parallel processes if the walks crash (esp. for large, memory-hungry networks)
 
-options(future.globals.maxSize = (20000*1024^2)) # 2 gb Max Size for Parallelization Processes
+options(future.globals.maxSize = (20000*1024^2)) # 20 gb Max Size for exporting objects to Parallelization Processes
 
 dir <- "news_classification"
 
@@ -127,9 +127,6 @@ walk_networks_list %>%
                   mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
                   vroom_write(file = paste0(dir, "/walk_terms/",
                                             network_name, ".csv"), append = F)
-                
-                
-                
   }, .progress = F)
 
   

@@ -128,9 +128,12 @@ tweet_sample_3 %>% summarise(n = n(), .by = sample)
 export_sample <- function(data, filename) {
   data[c(unique(tweets_highest$policy_field), "none")] <- NA # add empty columns for policy indicators
   data %>% select(!sample) %>% # drop sample indicator
+    arrange(`_source.created_at`) %>% # order by date
     mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% # utf8 conversion
     write.xlsx(file = filename)
 }
+
+export_sample(intercoder_sample, "evaluation_samples/twitter_sample_intercoder.xlsx")
 
 export_sample(tweet_sample_1, "evaluation_samples/twitter_sample_1.xlsx")
 
