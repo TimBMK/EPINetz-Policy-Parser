@@ -94,6 +94,7 @@ list.files(dir, pattern = "tokens_news", full.names = T) %>% # token files
     names(dat_list) <- walk_NE$week %>% unique() # name the dataframes in the list
     
     rm(walk_NE)
+    rm(news_data)
     
     gc()
     
