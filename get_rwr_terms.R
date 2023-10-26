@@ -310,6 +310,7 @@ make_multiplex_objects <- function(dat,              # data to be passed to calc
                                    vertex_b,         # vertex B column to be passed to calculate_network()
                                    directed = FALSE, # is the network directed?
                                    pmi_weight = TRUE,# should PMI weights be calculated? If TRUE, make sure vertex A and B are specified correctly
+                                   keep_negative_weights = TRUE, # should edges with negative (pmi) weight be kept or discarded?
                                    network = NULL,   # can be used to pass already-calculated networks. If NULL, a network will be calculated from the vertices
                                    keep_igraph_network = FALSE, # should the igraph network be kept as a seperate object? Note
                                    keep_multiplex_network = TRUE, # should the multiplex network be kept as a separate object?
