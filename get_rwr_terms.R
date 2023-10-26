@@ -270,7 +270,7 @@ get_rwr_terms <- function(walk_network, # an object made by make_multiplex_objec
 seed_walk <- function(seed, walk_network, normalize_score, positive_scores_only){ # convenience function for the seed walks to be used in get_rwr_terms()
   
   res <- tryCatch(# capture non-standard errors thrown by Random.Walk.Restart.Multiplex
-    RandomWalkRestartMH::Random.Walk.Restart.Multiplex(
+    Random.Walk.Restart.Multiplex.failsafe(
       x = walk_network$AdjMatrixNorm,
       MultiplexObject = walk_network$multiplex,
       Seeds = seed
@@ -422,16 +422,158 @@ compute.adjacency.matrix.mono <- function(x) # delta is no longer needed for mon
 }
 
 
+Random.Walk.Restart.Multiplex.failsafe <- function(x, MultiplexObject, Seeds, 
+                                                  r=0.7,tau,MeanType="Geometric", DispResults="TopScores",...){
+  
+  ## an adjusted version of https://github.com/alberto-valdeolivas/RandomWalkRestartMH/blob/master/R/RWRandMatrices.R
+  ##  including a failsafe for values in the proximity vectors reaching (-)Inf
+  
+  
+  ### We control the different values.
+  if (!is(x,"dgCMatrix")){
+    stop("Not a dgCMatrix object of Matrix package")
+  }
+  
+  if (!isMultiplex(MultiplexObject)) {
+    stop("Not a Multiplex object")
+  }
+  
+  L <- MultiplexObject$Number_of_Layers
+  N <- MultiplexObject$Number_of_Nodes
+  
+  Seeds <- as.character(Seeds)
+  if (length(Seeds) < 1 | length(Seeds) >= N){
+    stop("The length of the vector containing the seed nodes is not 
+         correct")
+  } else {
+    if (!all(Seeds %in% MultiplexObject$Pool_of_Nodes)){
+      stop("Some of the seeds are not nodes of the network")
+      
+    }
+  }
+  
+  if (r >= 1 || r <= 0) {
+    stop("Restart partameter should be between 0 and 1")
+  }
+  
+  if(missing(tau)){
+    tau <- rep(1,L)/L
+  } else {
+    tau <- as.numeric(tau)
+    if (sum(tau)/L != 1) {
+      stop("The sum of the components of tau divided by the number of 
+           layers should be 1")
+    }
+  }
+  
+  if(!(MeanType %in% c("Geometric","Arithmetic","Sum"))){
+    stop("The type mean should be Geometric, Arithmetic or Sum")
+  }
+  
+  if(!(DispResults %in% c("TopScores","Alphabetic"))){
+    stop("The way to display RWRM results should be TopScores or
+         Alphabetic")
+  }
+  
+  ## We define the threshold and the number maximum of iterations for
+  ## the random walker.
+  Threeshold <- 1e-10
+  NetworkSize <- ncol(x)
+  
+  ## We initialize the variables to control the flux in the RW algo.
+  residue <- 1
+  iter <- 1
+  
+  ## We compute the scores for the different seeds.
+  Seeds_Score <- get.seed.scoresMultiplex(Seeds,L,tau)
+  
+  ## We define the prox_vector(The vector we will move after the first RWR
+  ## iteration. We start from The seed. We have to take in account
+  ## that the walker with restart in some of the Seed nodes, depending on
+  ## the score we gave in that file).
+  prox_vector <- matrix(0,nrow = NetworkSize,ncol=1)
+  
+  prox_vector[which(colnames(x) %in% Seeds_Score[,1])] <- (Seeds_Score[,2])
+  
+  prox_vector  <- prox_vector/sum(prox_vector)
+  restart_vector <-  prox_vector
+  
+  vector_range <- 0
+  
+  while(!any(c(-Inf, Inf) %in% range(vector_range)) && # a failsafe to stop the loop from breaking when values reach -Inf or Inf
+        residue >= Threeshold){
+    
+    old_prox_vector <- prox_vector
+    prox_vector <- (1-r)*(x %*% prox_vector) + r*restart_vector
+    residue <- sqrt(sum((prox_vector-old_prox_vector)^2))
+    iter <- iter + 1;
+    vector_range <- range(prox_vector@x)
+  }
+  
+  
+  NodeNames <- character(length = N)
+  Score = numeric(length = N)
+  
+  rank_global <- data.frame(NodeNames = NodeNames, Score = Score)
+  rank_global$NodeNames <- gsub("_1", "", row.names(prox_vector)[seq_len(N)])
+  
+  if (MeanType=="Geometric"){
+    rank_global$Score <- geometric.mean(as.vector(prox_vector[,1]),L,N)    
+  } else {
+    if (MeanType=="Arithmetic") {
+      rank_global$Score <- regular.mean(as.vector(prox_vector[,1]),L,N)    
+    } else {
+      rank_global$Score <- sumValues(as.vector(prox_vector[,1]),L,N)    
+    }
+  }
+  
+  if (DispResults=="TopScores"){
+    ## We sort the nodes according to their score.
+    Global_results <- 
+      rank_global[with(rank_global, order(-Score, NodeNames)), ]
+    
+    ### We remove the seed nodes from the Ranking and we write the results.
+    Global_results <- 
+      Global_results[which(!Global_results$NodeNames %in% Seeds),]
+  } else {
+    Global_results <- rank_global    
+  }
+  
+  rownames(Global_results) <- c()
+  
+  RWRM_ranking <- list(RWRM_Results = Global_results,Seed_Nodes = Seeds)
+  
+  class(RWRM_ranking) <- "RWRM_Results"
+  return(RWRM_ranking)
+}
+
+get.seed.scoresMultiplex <- function(Seeds,Number_Layers,tau) { 
+  ## internal helper function from https://github.com/alberto-valdeolivas/RandomWalkRestartMH/blob/master/R/InternalFunctions.R
+  ##  required for random walk function
+  
+  Nr_Seeds <- length(Seeds)
+  
+  Seeds_Seeds_Scores <- rep(tau/Nr_Seeds,Nr_Seeds)
+  Seed_Seeds_Layer_Labeled <- 
+    paste0(rep(Seeds,Number_Layers),sep="_",rep(seq(Number_Layers), 
+                                                length.out = Nr_Seeds*Number_Layers,each=Nr_Seeds))
+  
+  Seeds_Score <- data.frame(Seeds_ID = Seed_Seeds_Layer_Labeled,
+                            Score = Seeds_Seeds_Scores, stringsAsFactors = FALSE)
+  
+  return(Seeds_Score)
+}
+
 
 # this function calculates a (pmi weighted) network. Based on https://github.com/TimBMK/Tools-Scripts/blob/master/Tools%20%26%20Scripts/network_snapshots.R
 calculate_network <-             # function to be mapped over timeframes
   function(data,
            vertex_a,
            vertex_b,
-           directed = FALSE, # is the network directed?
+           directed = FALSE, # is the network directed? Always undirected if pmi_weighht = T
            pmi_weight = TRUE, # should PMI weights be calculated? If TRUE, make sure vertex A and B are specified correctly
            as_data_frame = FALSE, # should the output be returned as a data frame? removes duplicated edges (a to b | b to a)
-           ...) {
+           keep_negative_weights = TRUE){ # should edges with negative weights be kept? Only applies if pmi_weight = T 
     
     require(dplyr)
     require(tidyr)
@@ -446,22 +588,29 @@ calculate_network <-             # function to be mapped over timeframes
           widyr::pairwise_pmi_(feature =  {{vertex_a}}, item = {{vertex_b}}, sort = F) %>% dplyr::rename(weight = pmi) %>% # calculate PMI as weight (use pairwise_pmi_() avoid problems with column specification)
           igraph::graph_from_data_frame(directed = F) %>%  # make igraph object for slice
           igraph::as_data_frame(what = "edges") %>% # temporarily convert to dataframe to identify identical a-b b-a edges
-          dplyr::distinct(from, to, .keep_all = TRUE) %>%  # remove duplicated edges introduced by PMI (a to b, b to a)
-          igraph::graph_from_data_frame(directed = F)  # back to igraph object 
+          dplyr::distinct(from, to, .keep_all = TRUE)   # remove duplicated edges introduced by PMI (a to b, b to a)
+        
+        if (!keep_negative_weights){
+          slice <- slice %>% filter(weight > 0)
+        }
+        
+        if (!as_data_frame){
+          slice <- slice %>% igraph::graph_from_data_frame(directed = F)  # convert to igraph object. Always undirected if PMI weighted
+        }
+        
       })
       
     } else {
       # unweighted if not pmi-weighted
       slice <-
         data %>% dplyr::as_tibble() %>%
-        dplyr::select({{ vertex_a }}, {{ vertex_b }}) %>%
-        igraph::graph_from_data_frame(directed = directed) # make igraph object for slice
+        dplyr::select({{ vertex_a }}, {{ vertex_b }}) 
+      
+      if (!as_data_frame) {
+        slice <- slice %>% igraph::graph_from_data_frame(directed = directed) # convert to igraph object 
+      } 
     }
-    
-    if (as_data_frame) {
-      slice <- igraph::as_data_frame(slice, what = "edges")
-    } 
-    
+
     return(slice)
     
   }
