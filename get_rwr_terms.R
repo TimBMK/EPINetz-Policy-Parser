@@ -136,10 +136,19 @@ get_rwr_terms <- function(walk_network, # an object made by make_multiplex_objec
                              group_results <- seed_group %>% 
                                dplyr::distinct(!!as.name(seed_var)) %>% dplyr::pull() %>%
                                furrr::future_map(\(seed) # running parallelization over the seeds (instead of whole groups) might add stability
-                                                 seed_walk(seed = seed, # calling an external functions is more robust in terms of not copying unnecessary object to the workers
-                                                           walk_network = walk_network, 
-                                                           normalize_score = normalize_score, 
-                                                           positive_scores_only = positive_scores_only)) %>% 
+                                                 {# calling an external functions is more robust in terms of not copying unnecessary object to the workers
+                                                   seed_walk_res <-
+                                                     seed_walk(
+                                                       seed = seed,
+                                                       walk_network = walk_network,
+                                                       normalize_score = normalize_score,
+                                                       positive_scores_only = positive_scores_only
+                                                     )
+                                                   if (is.null(seed_walk_res)) { # NULL returns from seed_walk indicate errors
+                                                     message(paste("No results returned for seed", seed, "in group", name, "\n"))
+                                                   }
+                                                   return(seed_walk_res)
+                               }) %>%
                                purrr::compact() %>%  # remove NULLs introduced by tryCatch for erroneous walks
                                data.table::rbindlist(use.names = TRUE)
                              
