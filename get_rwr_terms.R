@@ -463,7 +463,7 @@ Random.Walk.Restart.Multiplex.failsafe <- function(x, MultiplexObject, Seeds,
   }
   
   if (r >= 1 || r <= 0) {
-    stop("Restart partameter should be between 0 and 1")
+    stop("Restart parameter should be between 0 and 1")
   }
   
   if(missing(tau)){
@@ -573,6 +573,20 @@ get.seed.scoresMultiplex <- function(Seeds,Number_Layers,tau) {
   
   return(Seeds_Score)
 }
+
+geometric.mean <- function(Scores, L, N) {
+  ## internal helper function from https://github.com/alberto-valdeolivas/RandomWalkRestartMH/blob/master/R/InternalFunctions.R
+  ##  required for random walk function
+  
+  FinalScore <- numeric(length = N)
+  
+  for (i in seq_len(N)){
+    FinalScore[i] <- prod(Scores[seq(from = i, to = N*L, by=N)])^(1/L)
+  }
+  
+  return(FinalScore)
+}
+
 
 
 # this function calculates a (pmi weighted) network. Based on https://github.com/TimBMK/Tools-Scripts/blob/master/Tools%20%26%20Scripts/network_snapshots.R
