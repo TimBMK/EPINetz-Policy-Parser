@@ -98,35 +98,43 @@ if (!recalculate_all) { # drop timeframes where walk_terms were already calculat
                                       ".csv"))]
 }
 
+safe_rwr <- safely(get_rwr_terms) # make a function that always succeeds and captures errors. allows the process to keep running despite errors
+
 walk_networks_list %>% 
   future_walk(\(walk_network) 
               { network_name <- str_remove(walk_network, ".RDS") # reading in the data saved above
                 
                 if(report_quantiles) {cat(paste0("\n\n", network_name, "\n"))} # report time period (name of the network) if quantiles are reported
                 
-                readRDS(file.path(dir, "walk_network_data", walk_network)) %>% 
-                  get_rwr_terms(network_name = network_name,
-                                seeds = seeds,
-                                seed_var = "feature",
-                                match_var = "period",
-                                flatten_results = TRUE,
-                                group_name = "policy_field",
-                                normalize_score = walk_score_normalization,
-                                calculate_means = calculate_means,
-                                normalize_means = TRUE, # a second normalization of the means
-                                reduce_to_means = TRUE, # should only means be returned, dropping duplicated Nodes and their associated scores?
-                                positive_scores_only = positive_scores_only,
-                                walk_score = walk_score,
-                                walk_score_measure = walk_score_measure,
-                                walk_score_quantile = walk_score_quantile,
-                                report_quantiles = report_quantiles,
-                                keep_seed_terms = keep_seed_terms,
-                                seedterm_value = seedterm_value, # should the actual value of seed terms be overwritten by a default value, e.g. 1? NULL to skip
-                                progress = F) %>% 
-                  # write results to disk rather than saving them in the environmen
-                  mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
-                  vroom_write(file = paste0(dir, "/walk_terms/",
-                                            network_name, ".csv"), append = F)
+                res <- readRDS(file.path(dir, "walk_network_data", walk_network)) %>% 
+                  safe_rwr(network_name = network_name,
+                           seeds = seeds,
+                           seed_var = "feature",
+                           match_var = "period",
+                           flatten_results = TRUE,
+                           group_name = "policy_field",
+                           normalize_score = walk_score_normalization,
+                           calculate_means = calculate_means,
+                           normalize_means = TRUE, # a second normalization of the means
+                           reduce_to_means = TRUE, # should only means be returned, dropping duplicated Nodes and their associated scores?
+                           positive_scores_only = positive_scores_only,
+                           walk_score = walk_score,
+                           walk_score_measure = walk_score_measure,
+                           walk_score_quantile = walk_score_quantile,
+                           report_quantiles = report_quantiles,
+                           keep_seed_terms = keep_seed_terms,
+                           seedterm_value = seedterm_value, # should the actual value of seed terms be overwritten by a default value, e.g. 1? NULL to skip
+                           progress = F) 
+                
+                if (is.null(res$result)) { # if error, print the error
+                  warning(paste("Random Walk function returned an Error:", res$error, "\n"))
+                } else { # else, write results to disk rather than saving them in the environment
+                  res$result %>% 
+                    mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>%
+                    vroom_write(file = paste0(dir, "/walk_terms/",
+                                              network_name, ".csv"), append = F)
+                }
+                
   }, .progress = F)
 
   
