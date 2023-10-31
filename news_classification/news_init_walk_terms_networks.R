@@ -28,6 +28,8 @@ cat("\n ======= Preparations ======= \n")
 
 time_frame_walks = weeks(12) # length of the time frame for random walks
 
+keep_negative_weights = TRUE # should negative PMI weights in the networks be kept?
+
 # read data
 news_data <- list.files(file.path(dir, "data"), 
                         pattern = "data_news_", 
@@ -149,6 +151,7 @@ list.files(dir, pattern = "tokens_news", full.names = T) %>% # token files
                                       vertex_b = "lemma",
                                       directed = F,
                                       pmi_weight = T,
+                                      keep_negative_weights = keep_negative_weights,
                                       keep_igraph_network = F,
                                       keep_multiplex_network = T,
                                       keep_adjacency_matrix = F,

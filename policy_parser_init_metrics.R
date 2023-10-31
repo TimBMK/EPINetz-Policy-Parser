@@ -2,6 +2,9 @@ library(tidyverse)
 library(vroom)
 library(data.table)
 
+
+# Twitter
+
 tweet_data <- vroom(file = "Tokenizer/data_init_tweets_2023-06-22.csv.tar.gz",
                     # Important! specify coltypes to preserve correct IDs
                     col_types = list(
@@ -22,8 +25,10 @@ tweet_data <- tweet_data %>% mutate(is_retweet = case_when(
   str_detect(`_source.text`, "^RT") ~ TRUE,
   .default = FALSE))
 
+tweet_data %>% nrow()
 tweet_data %>% summarise(n = n(), .by = is_retweet)
 tweet_data %>% summarise(n = n(), .by = is_reply)
+tweet_data %>% filter(!is_reply & !is_retweet) %>% nrow()
 
 tweet_data %>% 
   mutate(week = ceiling_date(`_source.created_at`, unit = "weeks")) %>% 
@@ -60,3 +65,41 @@ tweets_classified %>%
   guides(fill = "none") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+
+
+# News
+
+news_data <- list.files(file.path("news_classification", "data"), 
+                        "data_news", full.names = T) %>% 
+  map(\(file) vroom(file)) %>% rbindlist(fill = T)
+
+news_data <- news_data %>% 
+  mutate(outlet = str_remove_all(`_source.host`,
+                                 paste0(c("^www\\.", "\\.de$", "\\.net$", 
+                                          "\\.co.uk$", "\\.com$"), 
+                                        collapse = "|")))
+
+news_data %>% summarise(n = n(), 
+                        start = min(`_source.estimated_date`), 
+                        end = max(`_source.estimated_date`), 
+                        .by = outlet)
+  # only faz, welt, bild and spiegel for the full time period
+  # english outlets neglectable (and only on a single day)
+
+news_data %>% filter(outlet == "faz" | outlet == "welt" | 
+                       outlet == "bild" | outlet == "spiegel") %>% 
+  nrow()
+
+news_data %>% filter(outlet == "faz" | outlet == "welt" | 
+                       outlet == "bild" | outlet == "spiegel") %>% 
+  summarise(n = n(), .by = outlet)
+
+news_data %>% 
+  summarise(n = n(), .by = outlet) %>% 
+  filter(n > 10) 
+
+news_data %>% 
+  summarise(n = n(), .by = outlet) %>% 
+  filter(n > 10) %>% 
+  summarise(total = sum(n))
