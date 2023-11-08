@@ -515,9 +515,15 @@ Random.Walk.Restart.Multiplex.failsafe <- function(x, MultiplexObject, Seeds,
     
     old_prox_vector <- prox_vector
     prox_vector <- (1-r)*(x %*% prox_vector) + r*restart_vector
+    vector_range <- range(prox_vector@x)
+    if (any(c(-Inf, Inf) %in% range(vector_range))) { # print the last Residue before infinity
+      warning(paste("Vector Range reached infinite values.",
+                    "Stopping Random Walk at", iter, "Iterations with Residue",
+                    residue, "instead of the intended Threshold of", Threeshold,
+                    "for Seed", Seeds))
+    }
     residue <- sqrt(sum((prox_vector-old_prox_vector)^2))
     iter <- iter + 1;
-    vector_range <- range(prox_vector@x)
   }
   
   
