@@ -138,13 +138,23 @@ classification_result <- classification_NE %>%
 
 # save
 
+classification_result %>% # sum missing results
+  iwalk(\(result, timeframe) 
+        {if(is.null(result)){
+          cat(paste("No result for timeframe", timeframe))
+        }})
+
+classification_result <- classification_result %>% compact() # remove missing timeframes
+
 saveRDS(classification_result, file = file.path(dir, "init_classified_tweets.RDS"))
+
 
 # check results
 
 classified_docs <- classification_result %>% 
   map_vec(\(dat)
-      {dat$classified_documents %>% distinct(doc_id) %>% nrow()}) %>% 
+          {
+            dat$classified_documents %>% distinct(doc_id) %>% nrow()}) %>% 
   sum()
 
 unclassified_docs <- classification_result %>% 
@@ -156,7 +166,8 @@ cat(paste(unclassified_docs, "out of",
           (unclassified_docs + classified_docs), 
           "documents classified",
           paste0("(", percent(unclassified_docs/
-                                (unclassified_docs + classified_docs)), 
+                                (unclassified_docs + classified_docs),
+                              accuracy = 0.01), 
                  " unclassified)")))
 
 
