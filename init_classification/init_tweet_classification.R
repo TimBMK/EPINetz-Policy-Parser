@@ -123,14 +123,15 @@ classification_result <- classification_NE %>%
              return_walk_terms = return_walk_terms, # should the processed walk terms be returned for further analysis and transparency?
              return_unclassified_docs = return_unclassified_docs, # should the IDs of the unlassified docs be returned? 
              # setting return_walk_terms or return_unclassified_docs to TURE returns a list of dataframes rather than a single dataframe
-             verbose = TRUE
-           )} else { # print a warning if the file does not exist
+             verbose = TRUE)
+           return(res)
+           } else { # print a warning if the file does not exist
              warning(paste(filename, "does not exist in the specified directory"))
            }
          
          cat("\n")
          
-         return(res)
+         
   }
   ) 
 
