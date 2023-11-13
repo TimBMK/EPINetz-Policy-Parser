@@ -511,30 +511,33 @@ get_unclassified_documents <- function( # a function to return a random sample o
     stop(paste(doc_id, "not found in the documents data provided."))
   }
   
-  if (mode == "print") {
-  if (n < nrow(classification_result$unclassified_documents)){ 
-    # return sample...
-    cat(paste("\nRandom Sample of", n, "out of", 
-              nrow(classification_result$unclassified_documents),
-              "unclassified Documents:\n"))
-    classification_result$unclassified_documents %>% 
-      dplyr::slice_sample(n = n) %>% 
-      dplyr::left_join(documents, by = doc_id) %>% 
-      print()
-  } else {
-    # ... or return all unclassified documents if n_return >= nr of unclassified docs
-    cat(paste("\nReturning all", 
-              nrow(classification_result$unclassified_documents),
-              "unclassified Documents:\n"))
-    classification_result$unclassified_documents %>% 
-      dplyr::left_join(documents, by = doc_id)  %>% 
-      print()
-  }}
-  
-  if (mode == "return") {
-    classification_result$unclassified_documents %>% 
-      dplyr::slice_sample(n = n) %>% 
-      dplyr::left_join(documents, by = doc_id) %>% 
-      return()
+  if (nrow(classification_result$unclassified_documents) > 0){ # check if there are unclassified docs
+    
+    if (mode == "print") {
+      if (n < nrow(classification_result$unclassified_documents)){ 
+        # return sample...
+        cat(paste("\nRandom Sample of", n, "out of", 
+                  nrow(classification_result$unclassified_documents),
+                  "unclassified Documents:\n"))
+        classification_result$unclassified_documents %>% 
+          dplyr::slice_sample(n = n) %>% 
+          dplyr::left_join(documents, by = doc_id) %>% 
+          print()
+      } else {
+        # ... or return all unclassified documents if n_return >= nr of unclassified docs
+        cat(paste("\nReturning all", 
+                  nrow(classification_result$unclassified_documents),
+                  "unclassified Documents:\n"))
+        classification_result$unclassified_documents %>% 
+          dplyr::left_join(documents, by = doc_id)  %>% 
+          print()
+      }}
+    
+    if (mode == "return") {
+      classification_result$unclassified_documents %>% 
+        dplyr::slice_sample(n = n) %>% 
+        dplyr::left_join(documents, by = doc_id) %>% 
+        return()
+    }
   }
 }
