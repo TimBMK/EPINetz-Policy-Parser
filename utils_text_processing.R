@@ -338,7 +338,7 @@ read_timelimited_data <- function(file, # this can handle multiple files, and wi
 
 split_timeframes <- function(data, # the dataframe to read in
                              datetime_var, # the name of the datetime var to use for splitting
-                             timeframe = lubridate::weeks(1), # the timeframe. can be any lubridate period
+                             timeframe = "weeks", # the timeframe. can be any lubridate period. See lubridate::ceiling_date() for details
                              before_after = c("before", "after") # split before or after the timeframe's endpoint
                              ){
   
