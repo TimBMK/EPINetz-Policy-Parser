@@ -152,7 +152,8 @@ for (i in 1:length(policy_networks[[timeframe]])){
          subtitle = paste("Policy Field:", 
                           names(policy_networks[[timeframe]][i])),
          edge_alpha = "Normalized PMI",
-         size = "Policy Score")
+         size = "Policy Score") +
+    theme_graph()
   
   print(graph)
   
@@ -166,7 +167,8 @@ field_networks[[timeframe]] %>%
   geom_node_point(aes(color = policy_field)) +
   geom_node_text(aes(label = name, color = policy_field), repel = TRUE) +
   labs(title = labs(title = names(field_networks[1])),
-       edge_alpha = "Policy Score")
+       edge_alpha = "Policy Score") +
+  theme_graph()
 
 
 

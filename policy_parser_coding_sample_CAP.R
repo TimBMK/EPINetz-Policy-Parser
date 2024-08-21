@@ -17,12 +17,10 @@ seed_sample <- function(data, # data
   return(res)
 }
 
-seed_twitter <- 20231218
-seed_news <- 20231218
+seed_twitter <- 20231127
+seed_news <- 20231117
 #set.seed(seed)
 
-threshold_twitter <- 0.7
-threshold_news <- 0.7
 
 ## Read data
 
@@ -45,30 +43,25 @@ tweet_data <- tweet_data %>% mutate(is_retweet = case_when( # add RT indicator
   .default = FALSE)) %>% 
   mutate(week = ceiling_date(`_source.created_at`, unit = "weeks")) # add week indicator
 
+tweet_data_full <- tweet_data # tweet data including RTs
+
+tweet_data <- tweet_data %>% filter(!is_retweet & !is_reply) # drop replies and retweets for the samples
+            # (replies were not classified, retweets need not be classified)
+
+
 tweet_classification <- readRDS("init_classification/init_classified_tweets.RDS")
 
-# tweets_highest <- tweet_classification %>%  # reduce to highest score per document to determine its policy field
-#   imap(\(week, date) 
-#        {week %>% .[["classified_documents"]]} %>% 
-#          slice_max(score_norm, by = doc_id) %>% 
-#          mutate(week = as_date(date))) %>% 
-#   rbindlist() %>% 
-#   rename(`_id` = doc_id) %>% # add variables
-#   left_join(tweet_data_full %>% 
-#               select(`_id`, `_source.created_at`, 
-#                      `_source.real_name`, `_source.text`),
-#             by = join_by(`_id`)) 
-
-classified_tweets <-  tweet_classification %>% # unnest 
-  map(\(dat) dat$classified_documents) %>%
+tweets_highest <- tweet_classification %>%  # reduce to highest score per document to determine its policy field
+  imap(\(week, date) 
+       {week %>% .[["classified_documents"]]} %>% 
+         slice_max(score_norm, by = doc_id) %>% 
+         mutate(week = as_date(date))) %>% 
   rbindlist() %>% 
-  filter(score_norm >= threshold_twitter) %>%  # select classifications above threshold (reduced nr of policy fields per tweet, drops tweets below)
-  left_join(tweet_data %>% # add additional vars like text
-              select(`_id`, `_source.created_at`,
-                     `_source.real_name`, `_source.text`, 
-                     week, is_retweet, is_reply),
-            by = join_by(doc_id == `_id`)) %>% 
-  filter(!is_retweet & !is_reply) # drop replies and retweets for the samples (replies were not classified, retweets need not be classified)
+  rename(`_id` = doc_id) %>% # add variables
+  left_join(tweet_data_full %>% 
+              select(`_id`, `_source.created_at`, 
+                     `_source.real_name`, `_source.text`),
+            by = join_by(`_id`)) 
 
 
 ### News
@@ -89,27 +82,18 @@ news_data <- news_data %>% # remove a small number of non-german outlets acciden
 
 news_classification <- readRDS("news_classification/init_classified_news.RDS")
 
-# news_highest <- news_classification %>%  # reduce to highest score per document to determine its policy field
-#   imap(\(week, date) 
-#        {week %>% .[["classified_documents"]]} %>% 
-#          slice_max(score_norm, by = doc_id) %>% 
-#          mutate(week = as_date(date))) %>% 
-#   rbindlist() %>% 
-#   rename(`_id` = doc_id) %>% # add variables
-#   left_join(news_data %>% 
-#               select(`_id`, `_source.estimated_date`, 
-#                      outlet, `_source.title`, `_source.body`),
-#             by = join_by(`_id`)) 
-
-classified_news <-  news_classification %>% # unnest 
-  map(\(dat) dat$classified_documents) %>%
+news_highest <- news_classification %>%  # reduce to highest score per document to determine its policy field
+  imap(\(week, date) 
+       {week %>% .[["classified_documents"]]} %>% 
+         slice_max(score_norm, by = doc_id) %>% 
+         mutate(week = as_date(date))) %>% 
   rbindlist() %>% 
-  filter(score_norm >= threshold_news) %>%  # select classifications above threshold (reduced nr of policy fields per tweet, drops tweets below)
-  left_join(news_data %>% # add additional vars like text
-              select(`_id`, `_source.estimated_date`,
-                     outlet, `_source.title`, `_source.body`,
-                     week),
-            by = join_by(doc_id == `_id`))
+  rename(`_id` = doc_id) %>% # add variables
+  left_join(news_data %>% 
+              select(`_id`, `_source.estimated_date`, 
+                     outlet, `_source.title`, `_source.body`),
+            by = join_by(`_id`)) 
+
 
 ## Pull Samples
 
@@ -118,18 +102,17 @@ classified_news <-  news_classification %>% # unnest
 #### 60% of sampled data are pulled over the timeframes (weeks), 40% are pulled over tweets associated with policy fields (highest association) to not underrepresent small fields
 
 tweet_sample_1 <- 
-  classified_tweets %>% # temporal sample
+  tweet_data %>% # temporal sample
   seed_sample(seed_twitter, n = 2, by = week)  %>% 
   mutate(sample = "temporal") %>% 
   bind_rows(
-    classified_tweets %>% # policy field sample
-      filter(!(doc_id %in% (classified_tweets %>% # not in temporal sample
-                 seed_sample(seed_twitter, n = 2, by = week) %>% pull(doc_id)))) %>% 
+    tweets_highest %>% # policy field sample
+      filter(!(`_id` %in% (tweet_data %>% # not in temporal sample
+                 seed_sample(seed_twitter, n = 2, by = week) %>% pull(`_id`)))) %>% 
       seed_sample(seed_twitter, n = 24, by = policy_field) %>% 
       mutate(sample = "policy")
   ) %>% 
-  select(doc_id, `_source.created_at`, `_source.text`, 
-         policy_field, sample)
+  select(`_id`, `_source.created_at`, `_source.real_name`, `_source.text`, sample)
 
 tweet_sample_1 %>% summarise(n = n(), .by = sample) # a roughly 60/40 ratio
 
@@ -138,44 +121,42 @@ twitter_intercoder_sample <- tweet_sample_1 %>% # make intercoder sample
   seed_sample(seed_twitter, n = 150, by = sample) # .. with even amounts of temporal and policy sourced tweets
 
 
-tweet_sample_2 <-  classified_tweets %>% # temporal sample
-  filter(!(doc_id %in% tweet_sample_1$doc_id)) %>% # not in previous samples
+tweet_sample_2 <-  tweet_data %>% # temporal sample
+  filter(!(`_id` %in% tweet_sample_1$`_id`)) %>% # not in previous samples
   seed_sample(seed_twitter, n = 2, by = week)  %>% 
   mutate(sample = "temporal") %>% 
   bind_rows(
-    classified_tweets %>% # policy field sample
-      filter(!(doc_id %in% tweet_sample_1$doc_id), # not in previous samples
-             !(doc_id %in% (classified_tweets %>% # not in temporal sample
-                             seed_sample(seed_twitter, n = 2, by = week) %>% pull(doc_id)))) %>% 
+    tweets_highest %>% # policy field sample
+      filter(!(`_id` %in% tweet_sample_1$`_id`), # not in previous samples
+             !(`_id` %in% (tweet_data %>% # not in temporal sample
+                             seed_sample(seed_twitter, n = 2, by = week) %>% pull(`_id`)))) %>% 
       seed_sample(seed_twitter, n = 24, by = policy_field) %>% 
       mutate(sample = "policy")
   ) %>% 
   seed_sample(seed_twitter, n = 700, weight_by = ifelse(sample == "temporal", 0.6, 0.4)) %>% # pull 700 of the 1000 documents, maintaining the 60/40 ratio
   bind_rows(twitter_intercoder_sample) %>% 
-  select(doc_id, `_source.created_at`, `_source.text`, 
-         policy_field, sample)
+  select(`_id`, `_source.created_at`, `_source.real_name`, `_source.text`, sample)
 
 tweet_sample_2 %>% summarise(n = n(), .by = sample)
 
 
-tweet_sample_3 <- classified_tweets %>% # temporal sample
-  filter(!(doc_id %in% tweet_sample_1$doc_id), # not in previous samples
-         !(doc_id %in% tweet_sample_2$doc_id)) %>% 
+tweet_sample_3 <- tweet_data %>% # temporal sample
+  filter(!(`_id` %in% tweet_sample_1$`_id`), # not in previous samples
+         !(`_id` %in% tweet_sample_2$`_id`)) %>% 
   seed_sample(seed_twitter, n = 2, by = week)  %>% 
   mutate(sample = "temporal") %>% 
   bind_rows(
-    classified_tweets %>% # policy field sample
-      filter(!(doc_id %in% tweet_sample_1$doc_id), # not in previous samples
-             !(doc_id %in% tweet_sample_2$doc_id),
-             !(doc_id %in% (classified_tweets %>% # not in temporal sample
-                             seed_sample(seed_twitter, n = 2, by = week) %>% pull(doc_id)))) %>% 
+    tweets_highest %>% # policy field sample
+      filter(!(`_id` %in% tweet_sample_1$`_id`), # not in previous samples
+             !(`_id` %in% tweet_sample_2$`_id`),
+             !(`_id` %in% (tweet_data %>% # not in temporal sample
+                             seed_sample(seed_twitter, n = 2, by = week) %>% pull(`_id`)))) %>% 
       seed_sample(seed_twitter, n = 24, by = policy_field) %>% 
       mutate(sample = "policy")
   ) %>% 
   seed_sample(seed_twitter, n = 700, weight_by = ifelse(sample == "temporal", 0.6, 0.4)) %>% # pull 700 of the 1000 documents, maintaining the 60/40 ratio
   bind_rows(twitter_intercoder_sample) %>% 
-  select(doc_id, `_source.created_at`, `_source.text`, 
-         policy_field, sample)
+  select(`_id`, `_source.created_at`, `_source.real_name`, `_source.text`, sample)
 
 tweet_sample_3 %>% summarise(n = n(), .by = sample)
 
@@ -183,23 +164,23 @@ tweet_sample_3 %>% summarise(n = n(), .by = sample)
 
 export_sample <- function(data, sort_col, filename) {
   data <- as.data.frame(data)
-  data["correct"] <- NA # add empty column for T/F indicators
+  data[c(unique(tweets_highest$policy_field), "none")] <- NA # add empty columns for policy indicators
   data %>% 
     arrange(!!as.name(sort_col)) %>% # order by date
-    mutate(intercoder_sample = case_when((doc_id %in% twitter_intercoder_sample$doc_id) ~ TRUE, # indicate intercoder sample
+    mutate(intercoder_sample = case_when((`_id` %in% twitter_intercoder_sample$`_id`) ~ TRUE, # indicate intercoder sample
                               .default = FALSE)) %>% 
     arrange(desc(intercoder_sample)) %>% # intercoder sample first
     select(!c(any_of("sample"))) %>% # drop sample indicator
     mutate(across(.cols = where(is.character),  ~ utf8::as_utf8(.x))) %>% # utf8 conversion
     write.xlsx(file = filename)
 }
-export_sample(twitter_intercoder_sample, "_source.created_at", "evaluation_samples/twitter_sample_intercoder.xlsx")
+export_sample(twitter_intercoder_sample, "_source.created_at", "evaluation_samples/CAP/twitter_sample_intercoder.xlsx")
 
-export_sample(tweet_sample_1, "_source.created_at", "evaluation_samples/twitter_sample_1.xlsx")
+export_sample(tweet_sample_1, "_source.created_at", "evaluation_samples/CAP/twitter_sample_1.xlsx")
 
-export_sample(tweet_sample_2, "_source.created_at", "evaluation_samples/twitter_sample_2.xlsx")
+export_sample(tweet_sample_2, "_source.created_at", "evaluation_samples/CAP/twitter_sample_2.xlsx")
 
-export_sample(tweet_sample_3, "_source.created_at", "evaluation_samples/twitter_sample_3.xlsx")
+export_sample(tweet_sample_3, "_source.created_at", "evaluation_samples/CAP/twitter_sample_3.xlsx")
 
 
 # #### in some cases, the text body of the samples was missing (due to RTs being present in the classified tweets, but not in the join data used)
@@ -242,65 +223,64 @@ export_sample(tweet_sample_3, "_source.created_at", "evaluation_samples/twitter_
 ####  14% are pulled over outlet, to represent all outlets
 
 news_sample_1 <- 
-  classified_news %>% # temporal sample
+  news_data %>% # temporal sample
   seed_sample(seed_news, n = 1, by = week)  %>% 
   mutate(sample = "temporal") %>% 
   bind_rows( # policy field sample
-    classified_news %>% 
-      filter(!(doc_id %in% (classified_news %>% # not in temporal sample
-                             seed_sample(seed_news, n = 1, by = week) %>% pull(doc_id)))) %>% 
+    news_highest %>% 
+      filter(!(`_id` %in% (news_data %>% # not in temporal sample
+                             seed_sample(seed_news, n = 1, by = week) %>% pull(`_id`)))) %>% 
       seed_sample(seed_news, n = 5, by = policy_field) %>% 
       mutate(sample = "policy")
   ) %>% 
   bind_rows( # outlet sample
-    classified_news %>% 
-      filter(!(doc_id %in% (classified_news %>% # not in temporal sample
+    news_data %>% 
+      filter(!(`_id` %in% (news_data %>% # not in temporal sample
                              seed_sample(seed_news, n = 1, by = week) %>% 
-                             pull(doc_id)))) %>% 
-      filter(!(doc_id %in% (classified_news %>% # not in policy sample
-                             filter(!(doc_id %in% (classified_news %>% 
+                             pull(`_id`)))) %>% 
+      filter(!(`_id` %in% (news_highest %>% # not in policy sample
+                             filter(!(`_id` %in% (news_data %>% 
                                                     seed_sample(seed_news, n = 1, 
                                                                 by = week) %>% 
-                                                    pull(doc_id)))) %>% 
+                                                    pull(`_id`)))) %>% 
                              seed_sample(seed_news, n = 5, by = policy_field)))) %>% 
       seed_sample(seed_news, n = 9, by = outlet) %>% 
       mutate(sample = "outlet")
   ) %>% 
-  select(doc_id, `_source.estimated_date`, outlet, `_source.title`, 
-         `_source.body`, policy_field, sample)
+  select(`_id`, `_source.estimated_date`, outlet, `_source.title`, `_source.body`, sample)
 
 news_sample_1 %>% summarise(n = n(), .by = sample) %>% 
-  mutate(percent = percent(n/sum(n), accuracy = 0.01)) # a roughly 66/19/15 ratio
+  mutate(percent = percent(n/sum(n), accuracy = 0.01)) # a roughly 63/19/18 ratio
 
 
 news_intercoder_sample <- news_sample_1 %>% # make intercoder sample
   seed_sample(seed_news, n = 43, by = sample) # .. with even amounts of temporal and policy sourced tweets
 
 
-news_sample_2 <-  classified_news %>% # temporal sample
-  filter(!(doc_id %in% news_sample_1$doc_id)) %>% # not in previous samples
+news_sample_2 <-  news_data %>% # temporal sample
+  filter(!(`_id` %in% news_sample_1$`_id`)) %>% # not in previous samples
   seed_sample(seed_news, n = 1, by = week)  %>% 
   mutate(sample = "temporal") %>% 
   bind_rows(
-    classified_news %>% # policy field sample
-      filter(!(doc_id %in% news_sample_1$doc_id)) %>%  # not in previous samples
-      filter(!(doc_id %in% (classified_news %>% # not in temporal sample
+    news_highest %>% # policy field sample
+      filter(!(`_id` %in% news_sample_1$`_id`)) %>%  # not in previous samples
+      filter(!(`_id` %in% (news_data %>% # not in temporal sample
                              seed_sample(seed_news, n = 1, by = week) %>% 
-                             pull(doc_id)))) %>% 
+                             pull(`_id`)))) %>% 
       seed_sample(seed_news, n = 5, by = policy_field) %>% 
       mutate(sample = "policy")
   ) %>% 
   bind_rows( # outlet sample
-    classified_news %>% 
-      filter(!(doc_id %in% news_sample_1$doc_id)) %>%  # not in previous samples
-      filter(!(doc_id %in% (classified_news %>% # not in temporal sample
+    news_data %>% 
+      filter(!(`_id` %in% news_sample_1$`_id`)) %>%  # not in previous samples
+      filter(!(`_id` %in% (news_data %>% # not in temporal sample
                              seed_sample(seed_news, n = 1, by = week) %>% 
-                             pull(doc_id)))) %>% 
-      filter(!(doc_id %in% (classified_news %>% # not in policy sample
-                             filter(!(doc_id %in% (classified_news %>% 
+                             pull(`_id`)))) %>% 
+      filter(!(`_id` %in% (news_highest %>% # not in policy sample
+                             filter(!(`_id` %in% (news_data %>% 
                                                     seed_sample(seed_news, n = 1, 
                                                                 by = week) %>% 
-                                                    pull(doc_id)))) %>% 
+                                                    pull(`_id`)))) %>% 
                              seed_sample(seed_news, n = 5, by = policy_field)))) %>% 
       seed_sample(seed_news, n = 9, by = outlet) %>% 
       mutate(sample = "outlet")
@@ -308,40 +288,39 @@ news_sample_2 <-  classified_news %>% # temporal sample
   seed_sample(seed_news, n = 308, weight_by = ifelse(sample == "temporal", 0.66, 
                                                 ifelse(sample == "policy", 0.20, 0.14))) %>% # pull 700 of the 1000 documents, maintaining the 60/40 ratio
   bind_rows(news_intercoder_sample) %>% 
-  select(doc_id, `_source.estimated_date`, outlet, `_source.title`, 
-         `_source.body`, policy_field, sample)
+  select(`_id`, `_source.estimated_date`, outlet, `_source.title`, `_source.body`, sample)
 
 news_sample_2 %>% summarise(n = n(), .by = sample) %>% 
   mutate(percent = percent(n/sum(n), accuracy = 0.01)) # a roughly 66/19/15 ratio
 
 
-news_sample_3 <-  classified_news %>% # temporal sample
-  filter(!(doc_id %in% news_sample_1$doc_id), # not in previous samples
-         !(doc_id %in% news_sample_2$doc_id)) %>% 
+news_sample_3 <-  news_data %>% # temporal sample
+  filter(!(`_id` %in% news_sample_1$`_id`), # not in previous samples
+         !(`_id` %in% news_sample_2$`_id`)) %>% 
   seed_sample(seed_news, n = 1, by = week)  %>% 
   mutate(sample = "temporal") %>% 
   bind_rows(
-    classified_news %>% # policy field sample
-      filter(!(doc_id %in% news_sample_1$doc_id), # not in previous samples
-             !(doc_id %in% news_sample_2$doc_id)) %>% 
-      filter(!(doc_id %in% (classified_news %>% # not in temporal sample
+    news_highest %>% # policy field sample
+      filter(!(`_id` %in% news_sample_1$`_id`), # not in previous samples
+             !(`_id` %in% news_sample_2$`_id`)) %>% 
+      filter(!(`_id` %in% (news_data %>% # not in temporal sample
                              seed_sample(seed_news, n = 1, by = week) %>% 
-                             pull(doc_id)))) %>% 
+                             pull(`_id`)))) %>% 
       seed_sample(seed_news, n = 5, by = policy_field) %>% 
       mutate(sample = "policy")
   ) %>% 
   bind_rows( # outlet sample
-    classified_news %>% 
-      filter(!(doc_id %in% news_sample_1$doc_id), # not in previous samples
-             !(doc_id %in% news_sample_2$doc_id)) %>% 
-      filter(!(doc_id %in% (classified_news %>% # not in temporal sample
+    news_data %>% 
+      filter(!(`_id` %in% news_sample_1$`_id`), # not in previous samples
+             !(`_id` %in% news_sample_2$`_id`)) %>% 
+      filter(!(`_id` %in% (news_data %>% # not in temporal sample
                              seed_sample(seed_news, n = 1, by = week) %>% 
-                             pull(doc_id)))) %>% 
-      filter(!(doc_id %in% (classified_news %>% # not in policy sample
-                             filter(!(doc_id %in% (classified_news %>% 
+                             pull(`_id`)))) %>% 
+      filter(!(`_id` %in% (news_highest %>% # not in policy sample
+                             filter(!(`_id` %in% (news_data %>% 
                                                     seed_sample(seed_news, n = 1, 
                                                                 by = week) %>% 
-                                                    pull(doc_id)))) %>% 
+                                                    pull(`_id`)))) %>% 
                              seed_sample(seed_news, n = 5, by = policy_field)))) %>% 
       seed_sample(seed_news, n = 9, by = outlet) %>% 
       mutate(sample = "outlet")
@@ -349,8 +328,7 @@ news_sample_3 <-  classified_news %>% # temporal sample
   seed_sample(seed_news, n = 308, weight_by = ifelse(sample == "temporal", 0.66, 
                                                 ifelse(sample == "policy", 0.20, 0.14))) %>% # pull 700 of the 1000 documents, maintaining the 60/40 ratio
   bind_rows(news_intercoder_sample) %>% 
-  select(doc_id, `_source.estimated_date`, outlet, `_source.title`, 
-         `_source.body`, policy_field, sample)
+  select(`_id`, `_source.estimated_date`, outlet, `_source.title`, `_source.body`, sample)
 
 news_sample_3 %>% summarise(n = n(), .by = sample) %>% 
   mutate(percent = percent(n/sum(n), accuracy = 0.01)) # a roughly 66/19/15 ratio
@@ -360,7 +338,7 @@ news_sample_3 %>% summarise(n = n(), .by = sample) %>%
 
 export_sample <- function(data, sort_col, filename) {
   data <- as.data.frame(data)
-  data["correct"] <- NA # add empty column for T/F indicators
+  data[c(unique(news_highest$policy_field), "none")] <- NA # add empty columns for policy indicators
   data <- data %>% mutate(`_source.body` = case_when( # truncate long documents
     str_length(`_source.body`) > 32767 ~ str_trunc(`_source.body`, 
                                                    width = 32767, 
@@ -368,7 +346,7 @@ export_sample <- function(data, sort_col, filename) {
     .default = `_source.body`))
   data %>% 
     arrange(!!as.name(sort_col)) %>% # order by date
-    mutate(intercoder_sample = case_when((doc_id %in% news_intercoder_sample$doc_id) ~ TRUE, # indicate intercoder sample
+    mutate(intercoder_sample = case_when((`_id` %in% news_intercoder_sample$`_id`) ~ TRUE, # indicate intercoder sample
                                          .default = FALSE)) %>% 
     arrange(desc(intercoder_sample)) %>% # intercoder sample first
     select(!c(any_of("sample"))) %>% # drop sample indicator
@@ -376,10 +354,10 @@ export_sample <- function(data, sort_col, filename) {
     write.xlsx(file = filename)
 }
 
-export_sample(news_intercoder_sample, "_source.estimated_date", "evaluation_samples/news_sample_intercoder.xlsx")
+export_sample(news_intercoder_sample, "_source.estimated_date", "evaluation_samples/CAP/news_sample_intercoder.xlsx")
 
-export_sample(news_sample_1, "_source.estimated_date", "evaluation_samples/news_sample_1.xlsx")
+export_sample(news_sample_1, "_source.estimated_date", "evaluation_samples/CAP/news_sample_1.xlsx")
 
-export_sample(news_sample_2, "_source.estimated_date", "evaluation_samples/news_sample_2.xlsx")
+export_sample(news_sample_2, "_source.estimated_date", "evaluation_samples/CAP/news_sample_2.xlsx")
 
-export_sample(news_sample_3, "_source.estimated_date", "evaluation_samples/news_sample_3.xlsx")
+export_sample(news_sample_3, "_source.estimated_date", "evaluation_samples/CAP/news_sample_3.xlsx")

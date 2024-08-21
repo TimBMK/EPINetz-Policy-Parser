@@ -103,3 +103,10 @@ news_data %>%
   summarise(n = n(), .by = outlet) %>% 
   filter(n > 10) %>% 
   summarise(total = sum(n))
+
+news_data %>% 
+  mutate(week = floor_date(`_source.estimated_date`, unit = "week")) %>% 
+  summarise(n = n(), .by = c(week, outlet)) %>% 
+  ggplot(aes(x = week, y = n, color = outlet)) +
+  geom_line() +
+  labs(title = "Documents over Time, by Outlet")
